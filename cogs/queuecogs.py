@@ -1,11 +1,13 @@
 import uuid
-
 import discord
 from discord import app_commands
 from discord.ext import commands
 from entities.Player import Player
 from entities.Queue import Queue
+from exceptions.exceptions import InvalidRankPlayerException
 from repositories.QueueRepository import QueueRepository
+from repositories.playerrepository import PlayerRepository
+from utils.Rank import Rank
 
 
 class CommandsQueue(commands.Cog):
@@ -13,53 +15,78 @@ class CommandsQueue(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.queues_repository = QueueRepository()
+        self.player_repository = PlayerRepository()
+        self.queue_rank_a = None
+        self.queue_rank_b = None
         self.view = discord.ui.View()
-        self.button_join = discord.ui.Button(label="Entrar/Sair", style=discord.ButtonStyle.green)
-        self.button_join.callback = self.button_join_callback
-        self.button_join.custom_id = "default"
-        self.view.add_item(self.button_join)
+        self.button_rank_a = discord.ui.Button(label="RANK A - Entrar/Sair", style=discord.ButtonStyle.green)
+        self.button_rank_b = discord.ui.Button(label="RANK B - Entrar/Sair", style=discord.ButtonStyle.green)
+        self.message = None  # Referência para a mensagem enviada
+
+        self.button_rank_a.custom_id = "default0"
+        self.button_rank_b.custom_id = "default1"
+        self.button_rank_a.callback = self.button_rank_callback
+        self.button_rank_b.callback = self.button_rank_callback
+
+        self.view.add_item(self.button_rank_a)
+        self.view.add_item(self.button_rank_b)
+
         super().__init__()
 
     @app_commands.command()
     async def start(self, interact: discord.Interaction):
-        queue = self.queues_repository.get_queue_by_player_id(str(interact.user.id))
-        print(f"QUEUE DO COMANDO /START {queue}")
-        if queue is not None:
-            await interact.response.send_message("Você já está em uma QUEUE!!!", ephemeral=True)
+        if self.queues_repository.get_amount_queue() > 2:
+            await interact.response.send_message("Já existem filas iniciadas.", ephemeral=True)
             return
 
-        player = Player(interact.user.id, interact.user.name, None)
-        queue = Queue(str(uuid.uuid4()))
-        queue.add_player(player)
-        self.queues_repository.save_queue(queue)
-        await interact.response.send_message("Você criou uma QUEUE", ephemeral=True)
+        self.queue_rank_a = Queue(str(uuid.uuid4()), Rank.RANK_A, 2)
+        self.queue_rank_b = Queue(str(uuid.uuid4()), Rank.RANK_B, 2)
 
-        # Atualizar o botão com o novo ID da fila
-        self.button_join.custom_id = queue.id
-        await interact.followup.send("Uma QUEUE foi iniciada!!!|", view=self.view)
+        self.queues_repository.save_queue(self.queue_rank_a)
+        self.queues_repository.save_queue(self.queue_rank_b)
 
-    async def button_join_callback(self, interact: discord.Interaction):
-        id_queue_from_button = interact.data['custom_id']  # O id do botão é o mesmo da QUEUE
-        print(f"ID QUEUE: {id_queue_from_button}")
-        print(self.queues_repository.get_amount_queue())
+        await interact.response.send_message("Você iniciou as filas", ephemeral=True)
+
+        self.button_rank_a.custom_id = self.queue_rank_a.id
+        self.button_rank_b.custom_id = self.queue_rank_b.id
+
+        # Envie a mensagem inicial com a quantidade de jogadores em cada fila
+        self.message = await interact.followup.send("Filas iniciadas", view=self.view)
+        await self.update_queue_message()
+
+    async def button_rank_callback(self, interact: discord.Interaction):
+        id_queue_from_button = interact.data['custom_id']
         queue_user = self.queues_repository.get_queue_by_player_id(str(interact.user.id))
-        print(f"QUEUE USER: {queue_user}")
+        current_queue = self.queues_repository.get_queue_by_id(str(id_queue_from_button))
+        player = self.player_repository.find_player_by_id(str(interact.user.id))
+
         if queue_user is not None:
-            queue_user.remove_player(str(interact.user.id))
+            queue_user.remove_player(player.discord_id)
             await interact.response.send_message("Você saiu da QUEUE", ephemeral=True)
-            await interact.followup.send(f"Players na fila: {queue_user.get_amount_players()}")
+            await self.update_queue_message()  # Atualizar a mensagem após a remoção do jogador
             return
 
-        queue = self.queues_repository.get_queue_by_id(str(id_queue_from_button))
-        print(f"QUEUE: {queue}")
-        if queue is not None:
-            player = Player(interact.user.id, interact.user.name, None)
-            queue.add_player(player)
-            # queue.get_all_players_name()
+        if current_queue is not None:
+            if player is not None:
+                try:
+                    current_queue.add_player(player)
+                except InvalidRankPlayerException:
+                    await interact.response.send_message(f"Você não pode jogar nesse rank ", ephemeral=True)
+                    return
+            else:
+                player = self.player_repository.save_player(
+                    Player(None, interact.user.id, interact.user.name, Rank.RANK_B, 0))
+                current_queue.add_player(player)
             await interact.response.send_message(f"@{player.name} Entrou!!!")
-            await interact.followup.send(f"Players na fila: {queue.get_amount_players()}")
+            await self.update_queue_message()
             return
-        print("NÃO ACHOU A QUEUE")
+
+    async def update_queue_message(self):
+        if self.message:
+            embed = discord.Embed(title="Filas iniciadas", color=discord.Color.green())
+            embed.add_field(name="Rank A", value=str(self.queue_rank_a.get_amount_players()), inline=True)
+            embed.add_field(name="Rank B", value=str(self.queue_rank_b.get_amount_players()), inline=True)
+            await self.message.edit(embed=embed)
 
 
 async def setup(bot):

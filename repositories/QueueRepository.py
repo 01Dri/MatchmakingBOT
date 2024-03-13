@@ -25,3 +25,8 @@ class QueueRepository:
 
     def remove_queue(self, queue: Queue):
         self.queues.pop(queue.id)
+
+    def get_all_players_on_queues(self):
+        for q in self.queues.values():
+            for p in q.players_on_queue:
+                print(p.name)
