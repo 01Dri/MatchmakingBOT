@@ -25,4 +25,5 @@ async def on_ready():
 #     bot.add_command(cmd)
 
 
+
 bot.run(token)
