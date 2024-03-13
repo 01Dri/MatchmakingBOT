@@ -19,19 +19,17 @@ class PlayerRepository:
                         )''')
 
     def save_player(self, player: Player):
-        QUERY_FIND = "SELECT * FROM players p WHERE p.discord_id = ?"
         QUERY_INSERT = "INSERT INTO players (discord_id, discord_name, rank, points) VALUES (?, ?, ?, ?)"
         UPDATE_QUERY = "UPDATE players SET rank = ?, points = ? WHERE discord_id = ?"
         VALUES_TO_INSERT = (player.discord_id, player.name, player.rank.value, player.points)
-        self.cursor = self.get_cursor()
-        self.cursor.execute(QUERY_FIND, (player.discord_id,))
-        if self.cursor.fetchone() is None:
+        if self.find_player_by_id(player.discord_id) is None:
             print("Jogador não existe, salvado-o no banco")
             self.cursor.execute(QUERY_INSERT, VALUES_TO_INSERT)
             self.conn.commit()
             id_player = self.cursor.lastrowid
             self.close_connections()
             return Player(id_player, player.discord_id, player.name, player.rank, player.points)
+
         print("Jogador já existe, atualizando suas informações")
         self.cursor.execute(UPDATE_QUERY, (player.rank, player.points))
         self.conn.commit()
@@ -46,9 +44,9 @@ class PlayerRepository:
         if row:
             rank = Rank(int(row[3]))
             player = Player(row[0], row[1], row[2], rank, row[4])
-            self.close_connections()
+            # self.close_connections()
             return player
-        self.close_connections()
+        # self.close_connections()
         # raise NotFoundPlayerException("Player não encontrado!!!")
         return None
 

@@ -2,6 +2,8 @@ import uuid
 import discord
 from discord import app_commands
 from discord.ext import commands
+
+from embeds.embedsmessages import queue_join_embed_message
 from entities.Player import Player
 from entities.Queue import Queue
 from exceptions.exceptions import InvalidRankPlayerException
@@ -35,18 +37,18 @@ class CommandsQueue(commands.Cog):
 
     @app_commands.command()
     async def start(self, interact: discord.Interaction):
-        if self.queues_repository.get_amount_queue() > 2:
-            await interact.response.send_message("Já existem filas iniciadas.", ephemeral=True)
-            return
 
-        self.queue_rank_a = Queue(str(uuid.uuid4()), Rank.RANK_A, 2)
-        self.queue_rank_b = Queue(str(uuid.uuid4()), Rank.RANK_B, 2)
-
-        self.queues_repository.save_queue(self.queue_rank_a)
-        self.queues_repository.save_queue(self.queue_rank_b)
+        if self.queues_repository.get_amount_queue() == 0:
+            self.queue_rank_a = Queue(str(uuid.uuid4()), Rank.RANK_A, 2)
+            self.queue_rank_b = Queue(str(uuid.uuid4()), Rank.RANK_B, 2)
+            self.queues_repository.save_queue(self.queue_rank_a)
+            self.queues_repository.save_queue(self.queue_rank_b)
+        else:
+            if self.queues_repository.get_amount_queue() >= 2:
+                await interact.response.send_message("Já existem filas iniciadas.", ephemeral=True)
+                return
 
         await interact.response.send_message("Você iniciou as filas", ephemeral=True)
-
         self.button_rank_a.custom_id = self.queue_rank_a.id
         self.button_rank_b.custom_id = self.queue_rank_b.id
 
@@ -62,7 +64,7 @@ class CommandsQueue(commands.Cog):
 
         if queue_user is not None:
             queue_user.remove_player(player.discord_id)
-            await interact.response.send_message("Você saiu da QUEUE", ephemeral=True)
+            await interact.response.send_message("Você saiu da fila", ephemeral=True)
             await self.update_queue_message()  # Atualizar a mensagem após a remoção do jogador
             return
 
@@ -77,7 +79,10 @@ class CommandsQueue(commands.Cog):
                 player = self.player_repository.save_player(
                     Player(None, interact.user.id, interact.user.name, Rank.RANK_B, 0))
                 current_queue.add_player(player)
-            await interact.response.send_message(f"@{player.name} Entrou!!!")
+            member = interact.user
+            await member.create_dm()
+            await member.dm_channel.send(embed=queue_join_embed_message(player, current_queue))
+            await interact.response.send_message(f"Você entrou na fila!!!", ephemeral=True)
             await self.update_queue_message()
             return
 

@@ -26,8 +26,11 @@ class Queue:
                 return player
 
     def get_all_players_name(self):
+        players = []
         for player in self.players_on_queue:
-            print(player.name)
+            players.append(player.name)
+        return players
+
 
     def remove_player(self, id_plauer: str):
         for p in self.players_on_queue:
