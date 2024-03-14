@@ -80,14 +80,15 @@ class CommandsQueue(commands.Cog):
         if current_queue is not None:
             if player is not None:
                 try:
-                    current_queue.add_player(player)
+                    current_queue.add_player(player, interact.user)
                 except InvalidRankPlayerException:
                     await interact.response.send_message(f"Você não pode jogar nesse rank ", ephemeral=True)
                     return
             else:
                 player = self.player_repository.save_player(
                     Player(None, interact.user.id, interact.user.name, Rank.RANK_B, 0))
-                current_queue.add_player(player)
+                current_queue.add_player(player, interact.user)
+
             member = interact.user
             await member.create_dm()
             await member.dm_channel.send(embed=queue_join_embed_message(player, current_queue))
@@ -115,9 +116,11 @@ class CommandsQueue(commands.Cog):
             if queue.get_amount_players() == queue.max_players:
                 print(f"LIMITE DE PLAYER DA FILA: {queue.id} ATINGIDO")
                 queues_to_remove.append(queue_id)
-                member = interact.user
-                await member.create_dm()
-                await member.dm_channel.send(embed=queue_start_voting_maps_message(queue))
+                for discord_user in queue.get_all_discord_users():
+                    await discord_user.create_dm()
+                    await discord_user.dm_channel.send(embed=queue_start_voting_maps_message(queue))
+                # await member.create_dm()
+                # await member.dm_channel.send(embed=queue_start_voting_maps_message(queue))
 
         for queue_id in queues_to_remove:
             queue = self.queues_repository.queues.pop(queue_id)
@@ -152,6 +155,11 @@ class CommandsQueue(commands.Cog):
             # Enviar uma nova mensagem com a view atualizada
             self.message = await interact.followup.send("Filas iniciadas", view=self.view)
             await self.update_queue_message()
+
+    async def create_channel_voting_maps(self, interact: discord.Interaction):
+        return
+
+
 
 
 async def setup(bot):

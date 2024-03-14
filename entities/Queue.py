@@ -10,8 +10,9 @@ class Queue:
         self.rank = rank.name
         self.max_players = max_players
         self.players_on_queue = []
+        self.discord_users = []
 
-    def add_player(self, plauer: Player):
+    def add_player(self, plauer: Player, user):
         if len(self.players_on_queue) == self.max_players:
             raise CrowdedQueueException(f"A fila está cheia!!!")
 
@@ -19,18 +20,24 @@ class Queue:
             raise InvalidRankPlayerException(f"O player deve ter o rank {self.rank}")
 
         self.players_on_queue.append(plauer)
+        self.discord_users.append(user)
 
     def get_player_by_id(self, id_player: str):
         for player in self.players_on_queue:
             if player.discord_id == id_player:
                 return player
 
-    def get_all_players_name(self):
+    def get_all_players(self):
         players = []
         for player in self.players_on_queue:
             players.append(player.name)
         return players
 
+    def get_all_discord_users(self):
+        users = []
+        for user in self.discord_users:
+            users.append(user)
+        return users
 
     def remove_player(self, id_plauer: str):
         for p in self.players_on_queue:

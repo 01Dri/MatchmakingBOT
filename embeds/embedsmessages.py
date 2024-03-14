@@ -10,7 +10,7 @@ def queue_join_embed_message(player: Player, queue: Queue):
     embed.add_field(name="ID DA FILA", value=queue.id, inline=False)
     embed.add_field(name="RANK DA FILA", value=queue.rank.replace("_", " "), inline=False)
     embed.add_field(name="QUANTIDADE DE JOGADORES:", value=queue.get_amount_players(), inline=False)
-    players = ', '.join(queue.get_all_players_name())
+    players = ', '.join(queue.get_all_players())
     embed.add_field(name="JOGADORES NA FILA:", value=players, inline=False)
     return embed
 
@@ -21,7 +21,7 @@ def queue_start_voting_maps_message(queue: Queue):
     embed.add_field(name="ID DA FILA", value=queue.id, inline=False)
     embed.add_field(name="RANK DA FILA", value=queue.rank.replace("_", " "), inline=False)
     embed.add_field(name="QUANTIDADE DE JOGADORES:", value=queue.get_amount_players(), inline=False)
-    players = ', '.join(queue.get_all_players_name())
+    players = ', '.join(queue.get_all_players())
     embed.add_field(name="JOGADORES NA FILA:", value=players, inline=False)
     embed.add_field(name="CANAL PARA VOTAÇÃO DOS MAPS: :", value="canalaqui", inline=False)
 
