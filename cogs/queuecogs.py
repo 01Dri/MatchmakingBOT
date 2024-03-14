@@ -46,7 +46,10 @@ class CommandsQueue(commands.Cog):
     async def start(self, interact: discord.Interaction):
 
         if self.queues_repository.get_amount_queue() == 0:
-            self.create_queues()
+            self.queue_rank_a = Queue(str(uuid.uuid4()), Rank.RANK_A, 2)
+            self.queue_rank_b = Queue(str(uuid.uuid4()), Rank.RANK_B, 2)
+            self.queues_repository.save_queue(self.queue_rank_a)
+            self.queues_repository.save_queue(self.queue_rank_b)
         else:
             if self.queues_repository.get_amount_queue() >= 2:
                 await interact.response.send_message("Já existem filas iniciadas.", ephemeral=True)
@@ -55,6 +58,9 @@ class CommandsQueue(commands.Cog):
         # Sistema para se alguma fila já atingiu seu limite maximo de players
         self.bot.loop.create_task(self.start_checking_queue(interact))
         await interact.response.send_message("Você iniciou as filas", ephemeral=True)
+        self.button_rank_a.custom_id = self.queue_rank_a.id
+        self.button_rank_b.custom_id = self.queue_rank_b.id
+
         self.message = await interact.followup.send("Filas iniciadas", view=self.view)
         await self.update_queue_message()
 
@@ -130,10 +136,35 @@ class CommandsQueue(commands.Cog):
         # Este for remove todos as filas cheias.
         for queue_id in queues_to_remove:
             queue = self.queues_repository.queues.pop(queue_id)
-            self.set_rank_to_queue(queue)
+            if queue.rank == Rank.RANK_A.name:
+                self.queue_rank_a = Queue(str(uuid.uuid4()), Rank.RANK_A, 2)
+                self.queues_repository.save_queue(self.queue_rank_a)
+                self.button_rank_a.custom_id = self.queue_rank_a.id
+
+            if queue.rank == Rank.RANK_B.name:
+                self.queue_rank_b = Queue(str(uuid.uuid4()), Rank.RANK_B, 2)
+                self.queues_repository.save_queue(self.queue_rank_b)
+                self.button_rank_b.custom_id = self.queue_rank_b.id
+
+                # Apagar a mensagem e os botões existentes
             await self.message.delete()
             self.view.clear_items()
-            self.set_new_buttons()
+
+            # Criar novos botões
+            new_button_rank_a = discord.ui.Button(label="RANK A - Entrar/Sair")
+            new_button_rank_b = discord.ui.Button(label="RANK B - Entrar/Sair")
+
+            new_button_rank_a.custom_id = self.queue_rank_a.id
+            new_button_rank_b.custom_id = self.queue_rank_b.id
+
+            new_button_rank_a.callback = self.button_rank_callback
+            new_button_rank_b.callback = self.button_rank_callback
+
+            # Adicionar os novos botões à view
+            self.view.add_item(new_button_rank_a)
+            self.view.add_item(new_button_rank_b)
+
+            # Enviar uma nova mensagem com a view atualizada
             self.message = await interact.followup.send("Filas iniciadas", view=self.view)
             await self.update_queue_message()
 
@@ -146,39 +177,6 @@ class CommandsQueue(commands.Cog):
         }
         await channel.edit(overwrites=overwrites)
         return channel
-
-    def create_queues(self):
-        self.queue_rank_a = Queue(str(uuid.uuid4()), Rank.RANK_A, 2)
-        self.queue_rank_b = Queue(str(uuid.uuid4()), Rank.RANK_B, 2)
-        self.queues_repository.save_queue(self.queue_rank_a)
-        self.queues_repository.save_queue(self.queue_rank_b)
-        self.button_rank_a.custom_id = self.queue_rank_a.id
-        self.button_rank_b.custom_id = self.queue_rank_b.id
-
-    def set_rank_to_queue(self, queue: Queue):
-        if queue.rank == Rank.RANK_A.name:
-            self.update_queue_id(Rank.RANK_A, self.queues_repository, self.button_rank_a, 2)
-
-        if queue.rank == Rank.RANK_B.name:
-            self.update_queue_id(Rank.RANK_B, self.queues_repository, self.button_rank_b, 2)
-
-    def update_queue_id(self, rank , queue_repository, button_rank, max_player):
-        queue = Queue(str(uuid.uuid4()), rank, max_player)
-        queue_repository.save_queue(queue)
-        button_rank.custom_id = queue.id
-
-    def create_button(self, label, custom_id, callback):
-        button = discord.ui.Button(label=label, style=discord.ButtonStyle.green)
-        button.custom_id = custom_id
-        button.callback = callback
-        return button
-
-    def set_new_buttons(self):
-        new_button_rank_a = self.create_button("RANK A - Entrar/Sair", self.queue_rank_a.id, self.button_rank_callback)
-        new_button_rank_b = self.create_button("RANK B - Entrar/Sair", self.queue_rank_b.id, self.button_rank_callback)
-
-        self.view.add_item(new_button_rank_a)
-        self.view.add_item(new_button_rank_b)
 
 
 async def setup(bot):
