@@ -1,6 +1,6 @@
 from entities.Player import Player
 from exceptions.exceptions import InvalidRankPlayerException, CrowdedQueueException
-from utils.Rank import Rank
+from enums.Rank import Rank
 
 
 class Queue:
@@ -30,7 +30,7 @@ class Queue:
     def get_all_players(self):
         players = []
         for player in self.players_on_queue:
-            players.append(player.name)
+            players.append(player)
         return players
 
     def get_all_discord_users(self):
