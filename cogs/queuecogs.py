@@ -5,7 +5,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from embeds.embedsmessages import queue_join_embed_message, queue_start_voting_maps_message
+from embeds.embedsmessages import queue_join_embed_message, queue_start_voting_maps_message, team_mate_embed_message
 from entities.Player import Player
 from entities.Queue import Queue
 from enums.StatusQueue import StatusQueue
@@ -48,12 +48,12 @@ class CommandsQueue(commands.Cog):
     async def startq(self, interact: discord.Interaction):
 
         if self.queues_repository.get_amount_queue() == 0:
-            self.queue_rank_a = Queue(str(uuid.uuid4()), Rank.RANK_A, 2)
-            self.queue_rank_b = Queue(str(uuid.uuid4()), Rank.RANK_B, 2)
+            self.queue_rank_a = Queue(str(uuid.uuid4()), Rank.RANK_A, 4)
+            self.queue_rank_b = Queue(str(uuid.uuid4()), Rank.RANK_B, 4)
             self.queues_repository.save_queue(self.queue_rank_a)
             self.queues_repository.save_queue(self.queue_rank_b)
         else:
-            if self.queues_repository.get_amount_queue() >= 2:
+            if self.queues_repository.get_amount_queue() >= 4:
                 await interact.response.send_message("Já existem filas iniciadas.", ephemeral=True)
                 return
 
@@ -157,18 +157,18 @@ class CommandsQueue(commands.Cog):
                         self.player_repository.save_player(
                             Player(player.id, player.discord_id, player.name, player.rank, player.points,
                                    StatusQueue.IN_VOTING_MAPS))
-                await self.send_maps_vote_to_map(channel_voting, interact)
+                await self.send_maps_vote_to_map(channel_voting, interact, queue)
 
     async def reset_buttons_and_queues(self, interact, queues_to_remove):
         for queue_id in queues_to_remove:
             queue = self.queues_repository.queues.pop(queue_id)
             if queue.rank == Rank.RANK_A.name:
-                self.queue_rank_a = Queue(str(uuid.uuid4()), Rank.RANK_A, 2)
+                self.queue_rank_a = Queue(str(uuid.uuid4()), Rank.RANK_A, 4)
                 self.queues_repository.save_queue(self.queue_rank_a)
                 self.button_rank_a.custom_id = self.queue_rank_a.id
 
             if queue.rank == Rank.RANK_B.name:
-                self.queue_rank_b = Queue(str(uuid.uuid4()), Rank.RANK_B, 2)
+                self.queue_rank_b = Queue(str(uuid.uuid4()), Rank.RANK_B, 4)
                 self.queues_repository.save_queue(self.queue_rank_b)
                 self.button_rank_b.custom_id = self.queue_rank_b.id
 
@@ -207,7 +207,7 @@ class CommandsQueue(commands.Cog):
         await channel.edit(overwrites=overwrites)
         return channel
 
-    async def send_maps_vote_to_map(self, channel, interact):
+    async def send_maps_vote_to_map(self, channel, interact, queue: Queue):
         messages = {}
         votes = {}
         winner_map = None
@@ -234,6 +234,9 @@ class CommandsQueue(commands.Cog):
         await self.get_votes_maps(messages, emoji_react, votes, interact)
         winner_map = max(votes, key=votes.get)
         await self.time_select_map_message.edit(content=f"Mapa escolhido: {winner_map}")
+        players = queue.get_all_players()
+        print(players)
+        await channel.send(embed=team_mate_embed_message(players, winner_map, 2))
 
     async def get_votes_maps(self, messages, emoji_react, votes, interact):
         end_time = time.time() + 30
