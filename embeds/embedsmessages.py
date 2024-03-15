@@ -30,7 +30,7 @@ def queue_start_voting_maps_message(queue: Queue, channel):
     return embed
 
 
-def team_mate_embed_message(players, map, num):
+def team_mate_embed_message(players, map):
     # Embaralhar os jogadores
     random.shuffle(players)
 

@@ -24,19 +24,12 @@ class CommandsQueue(commands.Cog):
         self.queue_rank_a = None
         self.queue_rank_b = None
         self.view = discord.ui.View()
-        self.button_rank_a = discord.ui.Button(label="RANK A - Entrar/Sair")  # , style=discord.ButtonStyle.green)
-        self.button_rank_b = discord.ui.Button(label="RANK B - Entrar/Sair")  # style=discord.ButtonStyle.green)
+        self.button_rank_a = None
+        self.button_rank_b = None
         self.message = None  # Referência para a mensagem enviada
         self.time_select_map_message = None
-
-        self.button_rank_a.custom_id = "default0"
-        self.button_rank_b.custom_id = "default1"
-        self.button_rank_a.callback = self.button_rank_callback
-        self.button_rank_b.callback = self.button_rank_callback
-
-        self.view.add_item(self.button_rank_a)
-        self.view.add_item(self.button_rank_b)
-
+        self.max_players_on_queue = 2
+        self.max_queues = 2
         super().__init__()
 
     async def start_checking_queue(self, interact):
@@ -48,21 +41,16 @@ class CommandsQueue(commands.Cog):
     async def startq(self, interact: discord.Interaction):
 
         if self.queues_repository.get_amount_queue() == 0:
-            self.queue_rank_a = Queue(str(uuid.uuid4()), Rank.RANK_A, 4)
-            self.queue_rank_b = Queue(str(uuid.uuid4()), Rank.RANK_B, 4)
-            self.queues_repository.save_queue(self.queue_rank_a)
-            self.queues_repository.save_queue(self.queue_rank_b)
+            self.create_queues()
         else:
-            if self.queues_repository.get_amount_queue() >= 4:
+            if self.queues_repository.get_amount_queue() >= self.max_queues:
                 await interact.response.send_message("Já existem filas iniciadas.", ephemeral=True)
                 return
 
         # Sistema para se alguma fila já atingiu seu limite maximo de players
         self.bot.loop.create_task(self.start_checking_queue(interact))
         await interact.response.send_message("Você iniciou as filas", ephemeral=True)
-        self.button_rank_a.custom_id = self.queue_rank_a.id
-        self.button_rank_b.custom_id = self.queue_rank_b.id
-
+        self.create_buttons_queue()
         self.message = await interact.followup.send("Filas iniciadas", view=self.view)
         await self.update_queue_message()
 
@@ -83,42 +71,41 @@ class CommandsQueue(commands.Cog):
 
     async def button_rank_callback(self, interact: discord.Interaction):
         id_queue_from_button = interact.data['custom_id']  # ID DA QUEUE  PELO BOTAO
-        queue_user = self.queues_repository.get_queue_by_player_id(str(interact.user.id))
         current_queue = self.queues_repository.get_queue_by_id(str(id_queue_from_button))
         player = self.player_repository.find_player_by_id(str(interact.user.id))
-
-        if queue_user is not None:
-            queue_user.remove_player(player.discord_id)
-            await interact.response.send_message("Você saiu da fila", ephemeral=True)
-            await self.update_queue_message()  # Atualizar a mensagem após a remoção do jogador
-            return
-
-        if current_queue is not None:
-            # if player is not None:
-            try:
-                if player is None:
-                    player = self.player_repository.save_player(
-                        Player(None, interact.user.id, interact.user.name, Rank.RANK_B, 0, StatusQueue.IN_QUEUE))
-
-                if player.queue_status == StatusQueue.IN_VOTING_MAPS.value:
-                    await interact.response.send_message(
-                        f"Vocẽ está no processo de votação de mapas, por favor retorne a sua sala ", ephemeral=True)
+        if player is not None:
+            for p in current_queue.get_all_players():
+                if player.discord_id == p.discord_id:
+                    current_queue.remove_player(player.discord_id)
+                    await interact.response.send_message("Você saiu da fila", ephemeral=True)
+                    await self.update_queue_message()
                     return
-                current_queue.add_player(player, interact.user)
+        else:
+                player = self.player_repository.save_player(
+                    Player(None, interact.user.id, interact.user.name, Rank.RANK_B, 0, StatusQueue.IN_QUEUE))
 
-            except InvalidRankPlayerException:
-                await interact.response.send_message(f"Você não pode jogar nesse rank ", ephemeral=True)
-                return
-            except CrowdedQueueException:
-                await interact.response.send_message(f"A fila já está cheia. por favor aguarde a proxima!!!", ephemeral=True)
-                return
-
-            member = interact.user
-            await member.create_dm()
-            await member.dm_channel.send(embed=queue_join_embed_message(player, current_queue))
-            await interact.response.send_message(f"Você entrou na fila!!!", ephemeral=True)
-            await self.update_queue_message()
+        if player.queue_status == StatusQueue.IN_VOTING_MAPS.value:
+            await interact.response.send_message(
+                f"Vocẽ está no processo de votação de mapas, por favor retorne a sua sala ", ephemeral=True)
             return
+
+        try:
+            current_queue.add_player(player, interact.user)
+        except InvalidRankPlayerException:
+            await interact.response.send_message(f"Você não pode jogar nesse rank ", ephemeral=True)
+            return
+        except CrowdedQueueException:
+            await interact.response.send_message(f"A fila já está cheia. por favor aguarde a proxima!!!",
+                                                 ephemeral=True)
+            return
+
+        member = interact.user
+        await member.create_dm()
+        await member.dm_channel.send(embed=queue_join_embed_message(player, current_queue))
+        await interact.response.send_message(f"Você entrou na fila!!!", ephemeral=True)
+        await self.update_queue_message()
+        return
+
 
     # Atualizar o embed com a quantidade jogadores nas filas de rank a e rank B
     async def update_queue_message(self):
@@ -143,7 +130,7 @@ class CommandsQueue(commands.Cog):
                 voting_maps_role = await guild.create_role(name=queue.id, color=discord.Color.gold())
                 queues_to_remove.append(queue_id)
                 await self.reset_buttons_and_queues(interact, queues_to_remove)
-                channel_voting = await self.create_channel_voting_maps(interact, queue, voting_maps_role)
+                channel_voting = await self.create_voting_maps_channel(interact, queue, voting_maps_role)
                 # Este for itera em cada conta do discord presente na fila e adiciona o cargo da fila e manda uma
                 # mensagem na DM
                 for discord_user in queue.get_all_discord_users():
@@ -160,44 +147,42 @@ class CommandsQueue(commands.Cog):
                 await self.send_maps_vote_to_map(channel_voting, interact, queue)
 
     async def reset_buttons_and_queues(self, interact, queues_to_remove):
-        for queue_id in queues_to_remove:
-            queue = self.queues_repository.queues.pop(queue_id)
-            if queue.rank == Rank.RANK_A.name:
-                self.queue_rank_a = Queue(str(uuid.uuid4()), Rank.RANK_A, 4)
-                self.queues_repository.save_queue(self.queue_rank_a)
-                self.button_rank_a.custom_id = self.queue_rank_a.id
+        for queue in queues_to_remove:
+            self.queues_repository.queues.pop(queue)
 
-            if queue.rank == Rank.RANK_B.name:
-                self.queue_rank_b = Queue(str(uuid.uuid4()), Rank.RANK_B, 4)
-                self.queues_repository.save_queue(self.queue_rank_b)
-                self.button_rank_b.custom_id = self.queue_rank_b.id
+        # self.create_queues()
+        # Apagar a mensagem e os botões existentes
+        await self.message.delete()
+        self.view.clear_items()
 
-            # Apagar a mensagem e os botões existentes
-            await self.message.delete()
-            self.view.clear_items()
+        await asyncio.sleep(10)
+        self.create_queues()
+        self.create_buttons_queue()
 
-            await asyncio.sleep(10)
+        # Enviar uma nova mensagem com a view atualizada
+        self.message = await interact.followup.send("Filas iniciadas", view=self.view)
+        await self.update_queue_message()
 
-            # Criar novos botões
-            new_button_rank_a = discord.ui.Button(label="RANK A - Entrar/Sair")
-            new_button_rank_b = discord.ui.Button(label="RANK B - Entrar/Sair")
+    def create_queues(self):
+        self.queue_rank_a = Queue(str(uuid.uuid4()), Rank.RANK_A, self.max_players_on_queue)
+        self.queue_rank_b = Queue(str(uuid.uuid4()), Rank.RANK_B, self.max_players_on_queue)
+        self.queues_repository.save_queue(self.queue_rank_a)
+        self.queues_repository.save_queue(self.queue_rank_b)
 
-            new_button_rank_a.custom_id = self.queue_rank_a.id
-            new_button_rank_b.custom_id = self.queue_rank_b.id
+    def create_buttons_queue(self):
+        self.button_rank_a = discord.ui.Button(label="RANK A - Entrar/Sair")
+        self.button_rank_b = discord.ui.Button(label="RANK B - Entrar/Sair")  # , style=discord.ButtonStyle.green)
 
-            new_button_rank_a.callback = self.button_rank_callback
-            new_button_rank_b.callback = self.button_rank_callback
+        self.button_rank_a.custom_id = self.queue_rank_a.id
+        self.button_rank_b.custom_id = self.queue_rank_b.id
 
-            # Adicionar os novos botões à view
-            self.view.add_item(new_button_rank_a)
-            self.view.add_item(new_button_rank_b)
+        self.button_rank_a.callback = self.button_rank_callback
+        self.button_rank_b.callback = self.button_rank_callback
 
-            # await asyncio.sleep(20)
-            # Enviar uma nova mensagem com a view atualizada
-            self.message = await interact.followup.send("Filas iniciadas", view=self.view)
-            await self.update_queue_message()
+        self.view.add_item(self.button_rank_a)
+        self.view.add_item(self.button_rank_b)
 
-    async def create_channel_voting_maps(self, interact: discord.Interaction, queue: Queue, role):
+    async def create_voting_maps_channel(self, interact: discord.Interaction, queue: Queue, role):
         guild = interact.guild
         channel = await guild.create_text_channel(queue.id)
         overwrites = {
@@ -220,7 +205,6 @@ class CommandsQueue(commands.Cog):
             "Sub-Base": "maps/Sub-Base.jpeg",
             "ViuvaT": "maps/ViuvaT.jpeg"
         }
-        emoji_react = '✅'
         await channel.send("VOTAÇÃO DOS MAPAS")
         for map_name, path in maps.items():
             embed = discord.Embed(title="MAPAS: ", color=discord.Color.red())
@@ -230,13 +214,17 @@ class CommandsQueue(commands.Cog):
             message = await channel.send(file=file, embed=embed)
             await message.add_reaction('✅')
             messages[path] = message
+
+        await self.choose_most_voted_map(channel, messages, votes, interact, queue)
+
+    async def choose_most_voted_map(self, channel, messages, votes, interact, queue):
+        emoji_react = '✅'
         self.time_select_map_message = await channel.send("Tempo restante: 1:00)")
         await self.get_votes_maps(messages, emoji_react, votes, interact)
         winner_map = max(votes, key=votes.get)
         await self.time_select_map_message.edit(content=f"Mapa escolhido: {winner_map}")
         players = queue.get_all_players()
-        print(players)
-        await channel.send(embed=team_mate_embed_message(players, winner_map, 2))
+        await channel.send(embed=team_mate_embed_message(players, winner_map))
 
     async def get_votes_maps(self, messages, emoji_react, votes, interact):
         end_time = time.time() + 30
