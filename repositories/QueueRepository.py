@@ -30,3 +30,14 @@ class QueueRepository:
         for q in self.queues.values():
             for p in q.players_on_queue:
                 print(p.name)
+
+    def remove_queues_by_id(self, queue_id):
+        for queue in self.get_all_queues():
+            if queue.id == queue_id:
+                self.remove_queue(queue)
+
+    def get_all_queues(self) -> [Queue]:
+        queues = []
+        for queue in self.queues.values():
+            queues.append(queue)
+        return queues

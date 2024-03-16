@@ -16,36 +16,38 @@ class PlayerRepository:
                             discord_name TEXT NOT NULL,
                             rank INTEGER NOT NULL,
                             points INTEGER,
+                            wins INTEGER,
+                            losses INTEGER,
                             queue_status INTEGER NOT NULL
                         )''')
 
-    def save_player(self, player: Player):
-        QUERY_INSERT = "INSERT INTO players (discord_id, discord_name, rank, points, queue_status) VALUES (?, ?, ?, ?, ?)"
+    def save_player(self, player: Player) -> Player:
+        QUERY_INSERT = "INSERT INTO players (discord_id, discord_name, rank, points, wins, losses, queue_status) VALUES (?, ?, ?, ?, ?, ?, ?)"
         UPDATE_QUERY = "UPDATE players SET rank = ?, points = ?, queue_status = ? WHERE discord_id = ?"
-        VALUES_TO_INSERT = (player.discord_id, player.name, player.rank.value, player.points, player.queue_status.value)
-        if self.find_player_by_id(player.discord_id) is None:
+        VALUES_TO_INSERT = (player.discord_id, player.name, player.rank.value, player.points, player.wins, player.losses, player.queue_status.value)
+        if self.find_player_by_discord_id(player.discord_id) is None:
             print("Jogador não existe, salvado-o no banco")
             self.cursor.execute(QUERY_INSERT, VALUES_TO_INSERT)
             self.conn.commit()
             id_player = self.cursor.lastrowid
             self.close_connections()
-            return Player(id_player, player.discord_id, player.name, player.rank, player.points, player.queue_status)
+            return Player(id_player, player.discord_id, player.name, player.rank, player.points, player.wins, player.losses, player.queue_status)
 
         print("Jogador já existe, atualizando suas informações")
-        self.cursor.execute(UPDATE_QUERY, (player.rank.value, player.points, player.queue_status.value, player.discord_id))
+        self.cursor.execute(UPDATE_QUERY, (player.rank.value, player.points, player.wins, player.losses,  player.queue_status.value, player.discord_id))
 
         self.conn.commit()
         self.close_connections()
-        return
+        return player
 
-    def find_player_by_id(self, discord_id_player: str):
+    def find_player_by_discord_id(self, discord_id_player: str):
         self.cursor = self.get_cursor()
         QUERY_FIND = "SELECT * FROM players WHERE discord_id = ?"
         self.cursor.execute(QUERY_FIND, (discord_id_player,))
         row = self.cursor.fetchone()
         if row:
             rank = Rank(int(row[3]))
-            player = Player(row[0], row[1], row[2], rank, row[4], row[5])
+            player = Player(row[0], row[1], row[2], rank, row[4], row[5], row[6], row[7])
             # self.close_connections()
             return player
         # self.close_connections()
