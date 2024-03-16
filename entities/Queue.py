@@ -27,6 +27,7 @@ class Queue:
         self.players_on_queue.append(plauer)
         self.discord_users.append(user)
 
+
     def add_player_unraked_queue(self, plauer: Player, user):
         self.players_on_queue.append(plauer)
         self.discord_users.append(user)

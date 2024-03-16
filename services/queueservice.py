@@ -17,25 +17,24 @@ from services.roleservice import RoleService
 
 class QueueService:
 
-    def __init__(self, max_players_for_queue, guild, view, message_button_create):
+    def __init__(self, max_players_for_queue):
         self.max_players_for_queue = max_players_for_queue
         self.view = discord.ui.View()
         self.queues_repository = QueueRepository()
         self.player_repository = PlayerRepository()
-        self.role_service = RoleService(guild)
-        self.button_service = QueueButtonService(view, message_button_create)
-        self.channel_service = ChannelService(guild)
+        # self.role_service = RoleService(guild)
+        # self.channel_service = ChannelService(guild)
         self.message_join_embed = None
+        self.queue_rank_a = None
+        self.queue_rank_b = None
 
-    def create_queue_ranked(self, rank) -> Queue:
+    def create_queue(self, rank) -> Queue:
         queue = Queue(str(uuid.uuid4()), rank, self.max_players_for_queue)
         self.queues_repository.save_queue(queue)
         return queue
 
-    def create_queue_unranked(self):
-        queue = Queue(str(uuid.uuid4()), Rank.UNRAKED, self.max_players_for_queue)
-        self.queues_repository.save_queue(queue)
-        return queue
+    def find_current_queue_player(self, player: Player):
+        return self.queues_repository.get_current_queue_user_by_discord_id(player.discord_id)
 
     def find_queue_by_id(self, queue_id):
         return self.queues_repository.get_queue_by_id(queue_id)
@@ -47,7 +46,8 @@ class QueueService:
         return self.queues_repository.get_amount_queue()
 
     def add_player_on_queue(self, player: Player, queue: Queue, user):
-        return queue.add_player_queue(player, user)
+        queue.add_player_queue(player, user)
+        return queue
 
     def remove_player_on_queue_by_discord_id(self, discord_id: str):
         for queue in self.queues_repository.get_all_queues():
@@ -85,24 +85,42 @@ class QueueService:
         for p in queue.get_all_players():
             queue.remove_player_by_discord_id(p)
 
-    async def remove_full_queues(self):
-        full_queue = self.get_all_queues_to_remove()
-        if full_queue:
-            for queue in full_queue:
-                role = await self.role_service.create_role(queue.id, discord.Color.gold())
-                channel_voting = await self.channel_service.create_channel_text(queue, role)
-                await self.message_service.send_dm_message_all_discord_users(queue.get_all_discord_users(),
-                                                                             queue_start_voting_maps_message(queue,
-                                                                                                             channel_voting))
-                await self.channel_service.send_voting_maps_message_to_channel(queue)
-                self.save_status_voting_for_players(queue)
-                self.remove_all_discord_user_on_queue(queue)
-                self.remove_all_players_on_queu(queue)
-                self.remove_queues_by_list_queue(full_queue)
-                self.button_service.clear_view()
-                await self.button_service.delete_message_button()
-                return True
-        return False
+    def find_full_queues(self):
+        queues_full = []
+        for queue in self.queues_repository.get_all_queues():
+            if queue.get_amount_players() == self.max_players_for_queue:
+                print(f"QUEUES LOTADAS: {queue}")
+                queues_full.append(queue)
+        return queues_full
+
+    async def set_role_all_users_on_queue(self, role, queue):
+        for user in queue.get_all_discord_users():
+            await user.add_roles(role)
+
+    def remove_full_queue(self, list_queues_full: [Queue]):
+        for queue_full in list_queues_full:
+            print(f"QUEUES LOTADAS QUE VAO SER APAGADAS: {queue_full.id}")
+            self.queues_repository.remove_queue(queue_full)
+            return queue_full
+
+    # async def remove_full_queues(self):
+    #     full_queue = self.get_all_queues_to_remove()
+    #     if full_queue:
+    #         for queue in full_queue:
+    #             role = await self.role_service.create_role(queue.id, discord.Color.gold())
+    #             channel_voting = await self.channel_service.create_channel_text(queue, role)
+    #             await self.message_service.send_dm_message_all_discord_users(queue.get_all_discord_users(),
+    #                                                                          queue_start_voting_maps_message(queue,
+    #                                                                                                          channel_voting))
+    #             await self.channel_service.send_voting_maps_message_to_channel(queue)
+    #             self.save_status_voting_for_players(queue)
+    #             self.remove_all_discord_user_on_queue(queue)
+    #             self.remove_all_players_on_queu(queue)
+    #             self.remove_queues_by_list_queue(full_queue)
+    #             self.button_service.clear_view()
+    #             await self.button_service.delete_message_button()
+    #             return True
+    #     return False
 
     def save_status_voting_for_players(self, queue: Queue):
         players = queue.get_all_players()

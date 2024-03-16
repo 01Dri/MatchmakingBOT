@@ -6,7 +6,7 @@ from entities.Player import Player
 from entities.Queue import Queue
 
 
-def embed_queues_message(queue: Queue):
+def embed_queues_message():
     embed = discord.Embed(title='MATCHMAKING FILA', description="Filas", color=0xff0000)
     embed.set_thumbnail(url="https://i.ibb.co/G3mkZ1p/Screenshot-from-2024-03-13-14-31-37.png")
     embed.add_field(name="PARTIDAS EM ANDAMENTO:", value=0, inline=False)
