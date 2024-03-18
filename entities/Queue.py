@@ -8,10 +8,11 @@ from enums.Rank import Rank
 
 class Queue:
 
-    def __init__(self, id, rank: Rank, max_players):
+    def __init__(self, id, rank: Rank, max_players, status: StatusQueue):
         self.id: str = str(id)
         self.rank = rank
         self.max_players = max_players
+        self.status = status
         self.players_on_queue = []
         self.discord_users = []
 

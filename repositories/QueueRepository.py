@@ -44,3 +44,6 @@ class QueueRepository:
         for queue in self.queues.values():
             queues.append(queue)
         return queues
+
+    def get_all_queues_id(self):
+        return self.queues.keys()

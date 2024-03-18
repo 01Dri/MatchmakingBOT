@@ -34,6 +34,7 @@ class QueueCommandCog(commands.Cog):
         self.maps_votes_record = {}
         self.maps_votes_users_record = {}
         self.map_path_image_vote = {}
+        self.votes_cancel = {}
         self.vote_message = None
         self.channel_vote_maps = None
         super().__init__()
@@ -44,8 +45,8 @@ class QueueCommandCog(commands.Cog):
         self.bot.loop.create_task(self.check_full_queues(interact))
 
         if self.queue_service.get_quantity_queue() == 0:
-            self.queue_rank_a = self.queue_service.create_queue(Rank.RANK_A)
-            self.queue_rank_b = self.queue_service.create_queue(Rank.RANK_B)
+            self.queue_rank_a = self.queue_service.create_queue(Rank.RANK_A, StatusQueue.DEFAULT)
+            self.queue_rank_b = self.queue_service.create_queue(Rank.RANK_B, StatusQueue.DEFAULT)
             self.button_queues = self.buttons_queues_service.create_button_queue("ENTRAR/SAIR",
                                                                                  f"{self.queue_rank_a.id} - {self.queue_rank_b.id}")
         else:
@@ -67,6 +68,42 @@ class QueueCommandCog(commands.Cog):
             print(f"QUANTIDADE DE FILAS APÓS REMOÇÃO: {self.queue_service.get_quantity_queue()}")
             return
         await interact.response.send_message("NÃO EXISTEM FILAS PARA SER REMOVIDAS!!!", ephemeral=True)
+
+    # @app_commands.command()
+    # async def cancelarpartida(self, interact: discord.Interaction):
+    #     channel_command = interact.channel
+    #     queue_id_by_channel_name = channel_command.name
+    #     if queue_id_by_channel_name in self.queue_service.get_all_id_queues():
+    #         current_queue = self.queue_service.find_queue_by_id(queue_id_by_channel_name)
+    #         self.queue_service.remove_queue_by_id(current_queue.id)
+    #         button_yes_cancel = discord.ui.Button(style=discord.ButtonStyle.green, label="Sim")
+    #         button_yes_cancel.custom_id = "sim"
+    #         button_no_cancel = discord.ui.Button(style=discord.ButtonStyle.red, label="Não")
+    #         button_yes_cancel.custom_id = "nao"
+    #         view = discord.ui.View()
+    #         view.add_item(button_yes_cancel)
+    #         view.add_item(button_no_cancel)
+    #         await interact.response.send_message("VOTAÇÃO PARA ENCERRAR A PARTIDA: ", view=view, ephemeral=False)
+    #         return
+    #     await interact.response.send_message("Nenhuma fila encontrada nesse canal!!!", ephemeral=True)
+
+    # async def callback_cancel_match(self, interact: discord.Interaction):
+    #     id_button = str(interact.data['custom_id'])
+    #     self.votes_cancel[id_button] += 1
+    #
+    #     async def get_result_cancel():
+    #         if not self.votes_cancel:
+    #             return None
+    #
+    #     max_votes = max(self.votes_cancel.values())
+    #     result = None
+    #
+    #     for vote_id, votes in self.votes_cancel.items():
+    #         if votes == max_votes:
+    #             result = vote_id
+    #             break
+    #
+    #     return result
 
     async def callback_button_queue(self, interact: discord.Interaction):
         self.queues_id = (str(interact.data['custom_id']))
@@ -121,7 +158,8 @@ class QueueCommandCog(commands.Cog):
             embed=embed_queues_message(self.queue_service.get_quantity_players_on_queues()))
 
         self.player_service.save_player(
-            Player(None, discord_id_player, str(interact.user.name), player.rank, player.points, player.wins, player.losses,
+            Player(None, discord_id_player, str(interact.user.name), player.rank, player.points, player.wins,
+                   player.losses,
                    StatusQueue.IN_QUEUE))
         # await self.buttons_queues_service.message_button_create.edit(embed=embed_queues_message(self.queue_service.get_quantity_players_on_queues())
 
@@ -131,14 +169,24 @@ class QueueCommandCog(commands.Cog):
             if len(self.queue_service.find_full_queues()) == 0:
                 pass
             else:
+
+                ## A QUEUE NÃO ESTÁ APAGANDO, ARRUMAR A FUNÇÃO DPS
                 queue = self.queue_service.remove_full_queue(self.queue_service.find_full_queues())
+                print(queue)
                 # role = await self.set_role_queue_to_users(guild, queue)
-                new_queue = self.queue_service.create_queue(queue.rank)
+                new_queue = self.queue_service.create_queue(queue.rank, StatusQueue.DEFAULT)
                 self.update_new_queue_after_full_queue(new_queue)
                 await self.update_button_queue_message()
 
                 self.channel_vote_maps = await self.create_channel_voting_maps(interact, queue)
-                await self.embeds_message_join[interact.user.name].edit(embed=embed_join_voting_maps(queue, self.channel_vote_maps))
+
+                for user in queue.discord_users:
+                    await self.embeds_message_join[user.name].edit(
+                        embed=embed_join_voting_maps(queue, self.channel_vote_maps))
+
+                # await self.embeds_message_join[interact.user.name].edit(
+                #     embed=embed_join_voting_maps(queue, self.channel_vote_maps))
+
                 await self.send_maps_vote_to_map()
 
                 await asyncio.sleep(30)
@@ -147,7 +195,7 @@ class QueueCommandCog(commands.Cog):
             await asyncio.sleep(10)
 
     def update_new_queue_after_full_queue(self, queue: Queue):
-        new_queue = self.queue_service.create_queue(queue.rank)
+        new_queue = self.queue_service.create_queue(queue.rank, StatusQueue.DEFAULT)
         if queue.rank == Rank.RANK_A:
             parts = self.queues_id.split(" - ")
             self.queues_id = parts[1] + " - " + new_queue.id

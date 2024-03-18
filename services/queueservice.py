@@ -28,8 +28,8 @@ class QueueService:
         self.queue_rank_a = None
         self.queue_rank_b = None
 
-    def create_queue(self, rank) -> Queue:
-        queue = Queue(str(uuid.uuid4()), rank, self.max_players_for_queue)
+    def create_queue(self, rank, status) -> Queue:
+        queue = Queue(str(uuid.uuid4()), rank, self.max_players_for_queue, status)
         self.queues_repository.save_queue(queue)
         return queue
 
@@ -106,6 +106,11 @@ class QueueService:
     def get_quantity_players_on_queues(self):
         return self.queues_repository.get_all_players_on_queues()
 
+    def remove_queue_by_id(self, queue_id: str):
+        self.queues_repository.remove_queues_by_id(queue_id)
+
+    def get_all_id_queues(self):
+        return self.queues_repository.get_all_queues_id()
     # async def remove_full_queues(self):
     #     full_queue = self.get_all_queues_to_remove()
     #     if full_queue:

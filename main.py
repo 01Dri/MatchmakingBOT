@@ -15,6 +15,7 @@ bot = commands.Bot(command_prefix=".", intents=intents)
 
 async def load_cogs():
     await bot.load_extension("cogs.queuecommandscog")
+    await bot.load_extension("cogs.blacksecuritycommandscog")
 
 
 @bot.event
