@@ -103,6 +103,9 @@ class QueueService:
             self.queues_repository.remove_queue(queue_full)
             return queue_full
 
+    def get_quantity_players_on_queues(self):
+        return self.queues_repository.get_all_players_on_queues()
+
     # async def remove_full_queues(self):
     #     full_queue = self.get_all_queues_to_remove()
     #     if full_queue:

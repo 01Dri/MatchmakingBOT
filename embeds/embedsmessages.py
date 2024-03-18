@@ -6,11 +6,29 @@ from entities.Player import Player
 from entities.Queue import Queue
 
 
-def embed_queues_message():
+def embed_queues_message(players):
     embed = discord.Embed(title='MATCHMAKING FILA', description="Filas", color=0xff0000)
     embed.set_thumbnail(url="https://i.ibb.co/G3mkZ1p/Screenshot-from-2024-03-13-14-31-37.png")
+    embed.add_field(name="PLAYERS EM FILA: :", value=players, inline=False)
     embed.add_field(name="PARTIDAS EM ANDAMENTO:", value=0, inline=False)
     return embed
+
+
+def emebed_map_voted(name_map):
+    embed = discord.Embed(title='MATCHMAKING VOTAÇÃO DE MAPAS', description="Votos", color=0xff0000)
+    embed.set_thumbnail(url="https://i.ibb.co/G3mkZ1p/Screenshot-from-2024-03-13-14-31-37.png")
+    embed.add_field(name="MAPA VOTADO:", value=name_map, inline=False)
+    return embed
+
+
+def embed_map_wiiner(name_map, votos):
+    embed = discord.Embed(title='MATCHMAKING VOTAÇÃO DE MAPAS ', description="Votos", color=0xff0000)
+    embed.set_thumbnail(url="https://i.ibb.co/G3mkZ1p/Screenshot-from-2024-03-13-14-31-37.png")
+    embed.add_field(name="MAPA ESCOLHIDO:", value=name_map, inline=False)
+    embed.add_field(name="QUANTIDADE DE VOTOS:", value=votos, inline=False)
+
+    return embed
+
 
 def embed_join_queue_message(queue: Queue):
     players = ', '.join([player.name for player in queue.get_all_players()])
@@ -20,6 +38,18 @@ def embed_join_queue_message(queue: Queue):
     embed.add_field(name="QUANTIDADE DE JOGADORES:", value=len(queue.get_all_players()), inline=False)
     embed.add_field(name="JOGADORES:", value=players, inline=False)
 
+    return embed
+
+def embed_join_voting_maps(queue: Queue, channel):
+    players = ', '.join([player.name for player in queue.get_all_players()])
+    embed = discord.Embed(title='MATCHMAKING VOTAÇÃO', description="VOTAÇÃO DE MAPAS INICIOU!!!", color=0xff0000)
+    embed.set_thumbnail(url="https://i.ibb.co/G3mkZ1p/Screenshot-from-2024-03-13-14-31-37.png")
+    embed.add_field(name="RANK DA FILA", value=queue.rank.name.replace("_", " "), inline=False)
+    embed.add_field(name="QUANTIDADE DE JOGADORES:", value=len(queue.get_all_players()), inline=False)
+    embed.add_field(name="JOGADORES:", value=players, inline=False)
+    embed.add_field(name="CANAL PARA VOTAÇÃO DOS MAPS:",
+                    value=f"[{channel.name}](https://discord.com/channels/{channel.guild.id}/{channel.id})",
+                    inline=False)
     return embed
 
 def queue_join_embed_message(player: Player, queue: Queue):

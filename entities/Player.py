@@ -1,6 +1,9 @@
+from enums.StatusQueue import StatusQueue
+
+
 class Player:
 
-    def __init__(self, id, discord_id, name, rank, points, wins: int, losses: int, queue_status):
+    def __init__(self, id, discord_id, name, rank, points, wins: int, losses: int, queue_status: StatusQueue):
         self.id: str = str(id)
         self.discord_id = str(discord_id)
         self.name = name

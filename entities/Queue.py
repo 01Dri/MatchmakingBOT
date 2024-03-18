@@ -1,6 +1,7 @@
 import discord
 
 from entities.Player import Player
+from enums.StatusQueue import StatusQueue
 from exceptions.exceptions import InvalidRankPlayerException, CrowdedQueueException
 from enums.Rank import Rank
 

@@ -1,17 +1,15 @@
 import asyncio
-import time
+import random
 
 import discord.ui
-from discord import app_commands, InteractionResponded
+from discord import app_commands
 from discord.ext import commands
-
-from embeds.embedsmessages import embed_queues_message, embed_join_queue_message, team_mate_embed_message
+from embeds.embedsmessages import embed_queues_message, embed_join_queue_message, emebed_map_voted, embed_map_wiiner, \
+    embed_join_voting_maps
 from entities.Player import Player
 from entities.Queue import Queue
 from enums.Rank import Rank
 from enums.StatusQueue import StatusQueue
-from exceptions.exceptions import CrowdedQueueException
-from repositories.playerrepository import PlayerRepository
 from services.playerservice import PlayerService
 from services.queuebuttonservice import QueueButtonService
 from services.queueservice import QueueService
@@ -33,11 +31,18 @@ class QueueCommandCog(commands.Cog):
         self.queues_id = None
         self.button_queues = None
         self.maps_voting_message = None
+        self.maps_votes_record = {}
+        self.maps_votes_users_record = {}
+        self.map_path_image_vote = {}
+        self.vote_message = None
+        self.channel_vote_maps = None
         super().__init__()
 
     @app_commands.command()
     async def iniciarfila(self, interact: discord.Interaction):
+        ## Verificando a cada segundo filas que podem estar cheias, ou seja. filas que devem ser inicializadas!!!
         self.bot.loop.create_task(self.check_full_queues(interact))
+
         if self.queue_service.get_quantity_queue() == 0:
             self.queue_rank_a = self.queue_service.create_queue(Rank.RANK_A)
             self.queue_rank_b = self.queue_service.create_queue(Rank.RANK_B)
@@ -47,9 +52,10 @@ class QueueCommandCog(commands.Cog):
             await interact.response.send_message("FILAS JÁ INICIADAS!!!")
             return
         await interact.response.send_message("Você iniciou as filas", ephemeral=True)
-        self.buttons_queues_service.message_button_create = await interact.followup.send(embed=embed_queues_message(),
-                                                                                         content="Filas iniciadas",
-                                                                                         view=self.buttons_queues_service.get_view())
+        self.buttons_queues_service.message_button_create = await interact.followup.send(
+            embed=embed_queues_message(self.queue_service.get_quantity_players_on_queues()),
+            content="Filas iniciadas",
+            view=self.buttons_queues_service.get_view())
 
     @app_commands.command()
     async def cancelarfilas(self, interact: discord.Interaction):
@@ -63,9 +69,7 @@ class QueueCommandCog(commands.Cog):
         await interact.response.send_message("NÃO EXISTEM FILAS PARA SER REMOVIDAS!!!", ephemeral=True)
 
     async def callback_button_queue(self, interact: discord.Interaction):
-
         self.queues_id = (str(interact.data['custom_id']))
-        print(self.queues_id)
         queues_id_parts = self.queues_id.split(" - ")
         queus_1 = self.queue_service.find_queue_by_id(queues_id_parts[0])
         queus_2 = self.queue_service.find_queue_by_id(queues_id_parts[1])
@@ -78,12 +82,17 @@ class QueueCommandCog(commands.Cog):
 
         discord_id_player = str(interact.user.id)
         player = self.player_service.find_player(discord_id_player)
+
         if player is None:
             player = self.player_service.save_player(
                 Player(None, discord_id_player, str(interact.user.name), Rank.RANK_B, 0, 0, 0,
-                       StatusQueue.IN_QUEUE))
+                       StatusQueue.DEFAULT))
+        print(player.queue_status)
 
         current_queue_user = self.queue_service.find_current_queue_player(player)
+        if player is not None and player.queue_status == StatusQueue.IN_VOTING_MAPS.value:
+            await interact.response.send_message("Você já está em uma partida!!!", ephemeral=True)
+            return
 
         if current_queue_user is not None:
             if current_queue_user == self.queue_rank_a or current_queue_user == self.queue_rank_b:
@@ -93,6 +102,8 @@ class QueueCommandCog(commands.Cog):
                         await embed_user.delete()
                     await interact.response.send_message("Você saiu da fila!!!", ephemeral=True)
                     print(f"PLAYERS NA FILA: {current_queue_user.get_all_players()}")
+                    await self.buttons_queues_service.message_button_create.edit(
+                        embed=embed_queues_message(self.queue_service.get_quantity_players_on_queues()))
                     return
 
         if player.rank == self.queue_rank_a.rank:
@@ -106,6 +117,13 @@ class QueueCommandCog(commands.Cog):
         embed = embed_join_queue_message(current_queue_user)
         self.embeds_message_join[interact.user.name] = await interact.followup.send(embed=embed, ephemeral=True)
         print(f"PLAYERS NA FILA: {current_queue_user.get_all_players()}")
+        await self.buttons_queues_service.message_button_create.edit(
+            embed=embed_queues_message(self.queue_service.get_quantity_players_on_queues()))
+
+        self.player_service.save_player(
+            Player(None, discord_id_player, str(interact.user.name), player.rank, player.points, player.wins, player.losses,
+                   StatusQueue.IN_QUEUE))
+        # await self.buttons_queues_service.message_button_create.edit(embed=embed_queues_message(self.queue_service.get_quantity_players_on_queues())
 
     async def check_full_queues(self, interact):
         guild = interact.guild
@@ -114,21 +132,19 @@ class QueueCommandCog(commands.Cog):
                 pass
             else:
                 queue = self.queue_service.remove_full_queue(self.queue_service.find_full_queues())
-                role = await self.set_role_queue_to_users(guild, queue)
-                channel = await self.create_channel_voting_maps(interact, queue, role)
-                await self.send_maps_vote_to_map(channel, interact, queue)
-
-                # AJUSTAR O SISTEMA DE VOTAÇÃO POIS DESSA FORMA É LERDO!!!!
+                # role = await self.set_role_queue_to_users(guild, queue)
                 new_queue = self.queue_service.create_queue(queue.rank)
                 self.update_new_queue_after_full_queue(new_queue)
                 await self.update_button_queue_message()
 
-            await asyncio.sleep(5)
+                self.channel_vote_maps = await self.create_channel_voting_maps(interact, queue)
+                await self.embeds_message_join[interact.user.name].edit(embed=embed_join_voting_maps(queue, self.channel_vote_maps))
+                await self.send_maps_vote_to_map()
 
-    async def set_role_queue_to_users(self, guild, queue):
-        voting_maps_role = await guild.create_role(name=queue.id, color=discord.Color.gold())
-        await self.queue_service.set_role_all_users_on_queue(voting_maps_role, queue)
-        return voting_maps_role
+                await asyncio.sleep(30)
+                await self.print_map_with_most_votes()
+
+            await asyncio.sleep(10)
 
     def update_new_queue_after_full_queue(self, queue: Queue):
         new_queue = self.queue_service.create_queue(queue.rank)
@@ -145,67 +161,132 @@ class QueueCommandCog(commands.Cog):
         self.button_queues.custom_id = self.queues_id
         self.buttons_queues_service.clear_view()
         self.buttons_queues_service.get_view().add_item(self.button_queues)
-        await self.buttons_queues_service.message_button_create.edit(embed=embed_queues_message(),
-                                                                     view=self.buttons_queues_service.get_view())
+        await self.buttons_queues_service.message_button_create.edit(
+            embed=embed_queues_message(self.queue_service.get_quantity_players_on_queues()),
+            view=self.buttons_queues_service.get_view())
+        print(self.button_queues.custom_id)
 
-    async def create_channel_voting_maps(self, interact: discord.Interaction, queue: Queue, role):
+    async def create_channel_voting_maps(self, interact: discord.Interaction, queue: Queue):
         guild = interact.guild
-        channel = await guild.create_text_channel(queue.id)
         overwrites = {
             guild.default_role: discord.PermissionOverwrite(read_messages=False),
-            role: discord.PermissionOverwrite(read_messages=True, send_messages=True)
+            guild.me: discord.PermissionOverwrite(read_messages=True),  # Garante que o bot possa ler mensagens
         }
-        await channel.edit(overwrites=overwrites)
+
+        for player in queue.get_all_players():
+            self.player_service.save_player(
+                Player(None, player.discord_id, str(interact.user.name), player.rank, player.points, player.wins,
+                       player.losses,
+                       StatusQueue.IN_VOTING_MAPS))
+
+        for discord_user in queue.get_all_discord_users():
+            member = guild.get_member(discord_user.id)
+            if member:
+                overwrites[member] = discord.PermissionOverwrite(read_messages=True)
+
+        channel = await guild.create_text_channel(queue.id, overwrites=overwrites)
         return channel
 
-    async def send_maps_vote_to_map(self, channel, interact, queue: Queue):
-        messages = {}
-        votes = {}
-        winner_map = None
-        maps = {
-            "Ankara-T": "maps/Ankara-T.jpeg",
-            "Mexico-T": "maps/MexicoT.jpeg",
-            "OLHO-2.0": "maps/OLHO-2.0.jpeg",
-            "Porto-T": "maps/Porto-T.jpeg",
-            "Satelite-T": "maps/Satelite-T.jpeg",
-            "Sub-Base": "maps/Sub-Base.jpeg",
-            "ViuvaT": "maps/ViuvaT.jpeg"
-        }
-        emoji_react = '✅'
-        await channel.send("VOTAÇÃO DOS MAPAS")
-        for map_name, path in maps.items():
-            embed = discord.Embed(title="MAPAS: ", color=discord.Color.red())
-            embed.add_field(name=map_name, value="Vote", inline=True)
-            file = discord.File(path, filename=f"{map_name}.jpeg")
-            embed.set_image(url=f"attachment://{map_name}.jpeg")
-            message = await channel.send(file=file, embed=embed)
-            await message.add_reaction('✅')
-            messages[path] = message
+    async def send_maps_vote_to_map(self):
 
-        self.maps_voting_message = await channel.send("Tempo restante: 1:00)")
-        await self.get_votes_maps(messages, emoji_react, votes, interact)
-        winner_map = max(votes, key=votes.get)
-        await self.maps_voting_message.edit(content=f"Mapa escolhido: {winner_map}")
-        players = queue.get_all_players()
-        print(players)
-        await channel.send(embed=team_mate_embed_message(players, winner_map))
+        maps = [
+            "Ankara-T",
+            "MexicoT",
+            "OLHO-2.0",
+            "Porto-T",
+            "Satelite-T",
+            "Sub-Base",
+            "ViuvaT"
+        ]
 
-    async def get_votes_maps(self, messages, emoji_react, votes, interact):
-        end_time = time.time() + 30
-        while time.time() < end_time:
-            remaining_time = int(end_time - time.time())
-            formatted_time = time.strftime("%M:%S", time.gmtime(remaining_time))  # Formatando o tempo restante
-            await self.maps_voting_message.edit(content=f"Tempo restante: {formatted_time}")
+        for map in maps:
+            self.maps_votes_record[map] = 0
 
-            for path, message in messages.items():
-                message = await message.channel.fetch_message(message.id)
-                react = discord.utils.get(message.reactions, emoji=emoji_react)
-                if react:
-                    count = react.count
-                    votes[path] = count
-            await asyncio.sleep(5)
+        embed = discord.Embed(title="SELEÇÃO DE MAPAS", description="Escolha um mapa:",
+                              color=0xFF0000)  # Cor vermelha: 0xFF0000
+        for map_name in maps:
+            embed.add_field(name=map_name, value=f"Vote pelo botão  para escolher o mapa {map_name}", inline=False)
 
-        return votes
+        buttons = [
+            discord.ui.Button(style=discord.ButtonStyle.primary, label=map_name) for map_name in maps
+        ]
+
+        view = discord.ui.View()
+        for b, map_name in zip(buttons, maps):
+            b.custom_id = map_name
+            b.callback = self.map_button_vote_callback
+            view.add_item(b)
+
+        await self.channel_vote_maps.send(embed=embed, view=view)
+        # print(f"mapa escolhido: {max(self.maps_votes_record, key=self.maps_votes_record.get)}")
+
+    async def map_button_vote_callback(self, interact: discord.Interaction):
+        map_button_id = str(interact.data['custom_id'])
+        id_user = str(interact.user.id)
+
+        async def register_vote():
+            if id_user in self.maps_votes_users_record.keys():
+                current_map_vote_user = self.maps_votes_users_record[id_user]
+                if current_map_vote_user != map_button_id:
+                    current_votes = self.maps_votes_record[current_map_vote_user]
+                    self.maps_votes_record[current_map_vote_user] = current_votes - 1
+
+                if map_button_id == current_map_vote_user:
+                    await interact.response.send_message(content="Você já votou neste mapa!!!",
+                                                         embed=emebed_map_voted(map_button_id), ephemeral=True)
+                    return
+
+            if map_button_id not in self.maps_votes_record.keys():
+                self.maps_votes_record[map_button_id] = 1
+                self.maps_votes_users_record[id_user] = map_button_id
+                self.map_path_image_vote[id_user] = rf"maps/{map_button_id}.jpeg"
+            else:
+                current_votes = self.maps_votes_record[map_button_id]
+                self.maps_votes_record[map_button_id] = current_votes + 1
+                self.maps_votes_users_record[id_user] = map_button_id
+                self.map_path_image_vote[id_user] = rf"maps/{map_button_id}.jpeg"
+
+            embed = emebed_map_voted(map_button_id)
+
+            await interact.response.send_message(content="Voto registrado", embed=embed, ephemeral=True)
+
+        try:
+            await asyncio.wait_for(register_vote(), timeout=30)
+        except asyncio.TimeoutError:
+            await self.print_map_with_most_votes()
+
+    async def print_map_with_most_votes(self):
+        map_with_most_votes = None
+        if not self.maps_votes_record:
+            # Se não houver votos registrados, escolha um mapa aleatório
+            random_map = random.choice(list(self.maps_votes_users_record.keys()))
+            max_votes = 0
+        else:
+            map_with_most_votes = self.get_map_with_most_votes()
+            max_votes = self.maps_votes_record[map_with_most_votes]
+            random_map = None
+
+        if random_map:
+            await self.channel_vote_maps.send(f"Ninguém votou! O mapa escolhido aleatoriamente é: {random_map}")
+        else:
+            file = discord.File(rf"maps/{map_with_most_votes}.jpeg")
+            await self.channel_vote_maps.send(file=file, embed=embed_map_wiiner(map_with_most_votes, max_votes))
+
+            # await channel.send(f"O mapa escolhido é: {map_with_most_votes}, com {max_votes} votos.")
+
+    def get_map_with_most_votes(self):
+        if not self.maps_votes_record:
+            return None  # Retorna None se não houver nenhum voto registrado ainda
+
+        max_votes = max(self.maps_votes_record.values())
+        map_with_most_votes = None
+
+        for map_id, votes in self.maps_votes_record.items():
+            if votes == max_votes:
+                map_with_most_votes = map_id
+                break
+
+        return map_with_most_votes
 
 
 async def setup(bot):

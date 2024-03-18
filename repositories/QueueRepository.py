@@ -28,9 +28,11 @@ class QueueRepository:
         self.queues.pop(queue.id)
 
     def get_all_players_on_queues(self):
+        players = []
         for q in self.queues.values():
             for p in q.players_on_queue:
-                print(p.name)
+                players.append(p)
+        return len(players)
 
     def remove_queues_by_id(self, queue_id):
         for queue in self.get_all_queues():

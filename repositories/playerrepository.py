@@ -23,7 +23,7 @@ class PlayerRepository:
 
     def save_player(self, player: Player) -> Player:
         QUERY_INSERT = "INSERT INTO players (discord_id, discord_name, rank, points, wins, losses, queue_status) VALUES (?, ?, ?, ?, ?, ?, ?)"
-        UPDATE_QUERY = "UPDATE players SET rank = ?, points = ?, queue_status = ? WHERE discord_id = ?"
+        UPDATE_QUERY = "UPDATE players SET rank = ?, points = ?, wins = ? , losses = ? , queue_status = ? WHERE discord_id = ?"
         VALUES_TO_INSERT = (player.discord_id, player.name, player.rank.value, player.points, player.wins, player.losses, player.queue_status.value)
         if self.find_player_by_discord_id(player.discord_id) is None:
             print("Jogador não existe, salvado-o no banco")
