@@ -6,11 +6,13 @@ from discord import app_commands
 from discord.ext import commands
 from embeds.embedsmessages import embed_queues_message, embed_join_queue_message, emebed_map_voted, embed_map_wiiner, \
     embed_join_voting_maps, team_mate_embed_message
+from entities.Match import Match
 from entities.Player import Player
 from entities.Queue import Queue
 from enums.Rank import Rank
 from enums.StatusQueue import StatusQueue
 from services.blacksecurityservice import BlackSecurityService
+from services.matchservice import MatchService
 from services.playerservice import PlayerService
 from services.queuebuttonservice import QueueButtonService
 from services.queueservice import QueueService
@@ -25,6 +27,7 @@ class QueueCommandCog(commands.Cog):
         self.buttons_queues_service = QueueButtonService(self.callback_button_queue)
         self.player_service = PlayerService()
         self.black_security_service = BlackSecurityService()
+        self.match_service = MatchService()
         self.queue_rank_a = None
         self.queue_rank_b = None
         self.before_embed = None
@@ -41,6 +44,9 @@ class QueueCommandCog(commands.Cog):
         self.channel_vote_maps = None
         self.voice_channel_a = None
         self.voice_channel_b = None
+        self.teammate_a = []
+        self.teammate_b = []
+        self.queue_category = None
 
         super().__init__()
 
@@ -59,7 +65,8 @@ class QueueCommandCog(commands.Cog):
             return
         await interact.response.send_message("Você iniciou as filas", ephemeral=True)
         self.buttons_queues_service.message_button_create = await interact.followup.send(
-            embed=embed_queues_message(self.queue_service.get_quantity_players_on_queues()),
+            embed=embed_queues_message(self.queue_service.get_quantity_players_on_queues(),
+                                       self.match_service.get_quantity_matches()),
             content="Filas iniciadas",
             view=self.buttons_queues_service.get_view())
 
@@ -145,7 +152,8 @@ class QueueCommandCog(commands.Cog):
                     await interact.response.send_message("Você saiu da fila!!!", ephemeral=True)
                     print(f"PLAYERS NA FILA: {current_queue_user.get_all_players()}")
                     await self.buttons_queues_service.message_button_create.edit(
-                        embed=embed_queues_message(self.queue_service.get_quantity_players_on_queues()))
+                        embed=embed_queues_message(self.queue_service.get_quantity_players_on_queues(),
+                                                   self.match_service.get_quantity_matches()))
                     return
 
         if player.rank == self.queue_rank_a.rank:
@@ -160,7 +168,8 @@ class QueueCommandCog(commands.Cog):
         self.embeds_message_join[interact.user.name] = await interact.followup.send(embed=embed, ephemeral=True)
         print(f"PLAYERS NA FILA: {current_queue_user.get_all_players()}")
         await self.buttons_queues_service.message_button_create.edit(
-            embed=embed_queues_message(self.queue_service.get_quantity_players_on_queues()))
+            embed=embed_queues_message(self.queue_service.get_quantity_players_on_queues(),
+                                       self.match_service.get_quantity_matches()))
 
         self.player_service.save_player(
             Player(None, discord_id_player, str(interact.user.name), player.rank, player.points, player.wins,
@@ -174,28 +183,28 @@ class QueueCommandCog(commands.Cog):
             if len(self.queue_service.find_full_queues()) == 0:
                 pass
             else:
-
-                ## A QUEUE NÃO ESTÁ APAGANDO, ARRUMAR A FUNÇÃO DPS
                 queue = self.queue_service.remove_full_queue(self.queue_service.find_full_queues())
-                print(queue)
-                # role = await self.set_role_queue_to_users(guild, queue)
+                await self.create_category(interact, queue)
                 new_queue = self.queue_service.create_queue(queue.rank, StatusQueue.DEFAULT)
                 self.update_new_queue_after_full_queue(new_queue)
+
+                self.match_service.add_match(
+                    Match(queue.id, self.channel_vote_maps, self.voice_channel_a, self.voice_channel_b, self.teammate_a,
+                          self.teammate_b))
+
                 await self.update_button_queue_message()
 
                 self.channel_vote_maps = await self.create_channel_voting_maps(interact, queue)
+                print(self.channel_vote_maps)
 
                 for user in queue.discord_users:
                     await self.embeds_message_join[user.name].edit(
                         embed=embed_join_voting_maps(queue, self.channel_vote_maps))
 
-                # await self.embeds_message_join[interact.user.name].edit(
-                #     embed=embed_join_voting_maps(queue, self.channel_vote_maps))
-
                 await self.send_maps_vote_to_map()
                 await asyncio.sleep(30)
                 map_winner = await self.print_map_with_most_votes()
-                await self.create_voice_channel(interact, queue)
+                await self.create_voice_channel(interact, queue, self.match_service.get_quantity_matches())
                 await self.send_teams(queue, map_winner, self.black_security_service.get_random_key())
 
             await asyncio.sleep(10)
@@ -216,9 +225,14 @@ class QueueCommandCog(commands.Cog):
         self.buttons_queues_service.clear_view()
         self.buttons_queues_service.get_view().add_item(self.button_queues)
         await self.buttons_queues_service.message_button_create.edit(
-            embed=embed_queues_message(self.queue_service.get_quantity_players_on_queues()),
+            embed=embed_queues_message(self.queue_service.get_quantity_players_on_queues(),
+                                       self.match_service.get_quantity_matches()),
             view=self.buttons_queues_service.get_view())
         print(self.button_queues.custom_id)
+
+    async def create_category(self, interact, queue):
+        self.queue_category = await interact.guild.create_category(queue.id)
+
 
     async def create_channel_voting_maps(self, interact: discord.Interaction, queue: Queue):
 
@@ -228,31 +242,29 @@ class QueueCommandCog(commands.Cog):
                        player.losses,
                        StatusQueue.IN_VOTING_MAPS))
 
-        channel = await interact.guild.create_text_channel(queue.id, overwrites=self.get_overwrites(interact, queue))
+        channel = await self.queue_category.create_text_channel("Votação de mapas", overwrites=self.get_overwrites(interact, queue))
         return channel
 
     async def send_teams(self, queue, map_winner, key):
-        await self.channel_vote_maps.send(embed=team_mate_embed_message(queue.get_all_players(), self.voice_channel_a, self.voice_channel_b, map_winner, key))
+        players = queue.get_all_players()
+        random.shuffle(players)
+        halfway_point = len(players) // 2
+        self.teammate_a = players[:halfway_point]
+        self.teammate_b = players[halfway_point:]
+
+        await self.channel_vote_maps.send(
+            embed=team_mate_embed_message(self.voice_channel_a, self.voice_channel_b, map_winner, key, self.teammate_a,
+                                          self.teammate_b))
         self.black_security_service.remove_one_key(key)
 
-    async def create_voice_channel(self, interact, queue):
-        # guild = interact.guild
-        # overwrites = {
-        #     guild.default_role: discord.PermissionOverwrite(read_messages=False),
-        #     guild.me: discord.PermissionOverwrite(read_messages=True),  # Garante que o bot possa ler mensagens
-        # }
-        #
-        # for discord_user in queue.get_all_discord_users():
-        #     member = guild.get_member(discord_user.id)
-        #     if member:
-        #         overwrites[member] = discord.PermissionOverwrite(read_messages=True)
+    async def create_voice_channel(self, interact, queue, match_number):
+        self.voice_channel_a =  await self.queue_category.create_voice_channel(f"PARTIDA {match_number} - Time A",
+                                                                         overwrites=self.get_overwrites(interact,
+                                                                                                        queue))
 
-        self.voice_channel_a = await interact.guild.create_voice_channel(f"PARTIDA 1 - Time A",
-                                                                         overwrites=self.get_overwrites(interact,
-                                                                                                        queue))
-        self.voice_channel_b = await interact.guild.create_voice_channel(f"PARTIDA 1 - Time B",
-                                                                         overwrites=self.get_overwrites(interact,
-                                                                                                        queue))
+        self.voice_channel_b = await self.queue_category.create_voice_channel(f"PARTIDA {match_number} - Time B",
+                                                                     overwrites=self.get_overwrites(interact,
+                                                                                                    queue))
 
     def get_overwrites(self, interact, queue):
         guild = interact.guild
@@ -350,7 +362,7 @@ class QueueCommandCog(commands.Cog):
             file = discord.File(rf"maps/{map_with_most_votes}.jpeg")
             await self.channel_vote_maps.send(file=file, embed=embed_map_wiiner(map_with_most_votes, max_votes))
         return map_with_most_votes
-            # await channel.send(f"O mapa escolhido é: {map_with_most_votes}, com {max_votes} votos.")
+        # await channel.send(f"O mapa escolhido é: {map_with_most_votes}, com {max_votes} votos.")
 
     def get_map_with_most_votes(self):
         if not self.maps_votes_record:

@@ -7,7 +7,7 @@ class PlayerService:
         self.player_repository = PlayerRepository()
 
     def find_player(self, discord_id: str) -> Player:
-        return  self.player_repository.find_player_by_discord_id(discord_id)
+        return self.player_repository.find_player_by_discord_id(discord_id)
 
     def save_player(self, player: Player):
         return self.player_repository.save_player(

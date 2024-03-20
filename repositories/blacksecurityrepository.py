@@ -60,6 +60,8 @@ class BlackSecurityRepository:
         self.close_connections()
 
     def remove_key(self, key):
+        if key is None:
+            return
         QUERY = "DELETE FROM blackkeys WHERE key = ?"
         cursor = self.get_cursor()
         cursor.execute(QUERY, (key.id,))
