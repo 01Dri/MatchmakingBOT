@@ -5,11 +5,12 @@ import discord.ui
 from discord import app_commands
 from discord.ext import commands
 from embeds.embedsmessages import embed_queues_message, embed_join_queue_message, emebed_map_voted, embed_map_wiiner, \
-    embed_join_voting_maps
+    embed_join_voting_maps, team_mate_embed_message
 from entities.Player import Player
 from entities.Queue import Queue
 from enums.Rank import Rank
 from enums.StatusQueue import StatusQueue
+from services.blacksecurityservice import BlackSecurityService
 from services.playerservice import PlayerService
 from services.queuebuttonservice import QueueButtonService
 from services.queueservice import QueueService
@@ -23,6 +24,7 @@ class QueueCommandCog(commands.Cog):
         self.queue_service = QueueService(2)
         self.buttons_queues_service = QueueButtonService(self.callback_button_queue)
         self.player_service = PlayerService()
+        self.black_security_service = BlackSecurityService()
         self.queue_rank_a = None
         self.queue_rank_b = None
         self.before_embed = None
@@ -37,6 +39,9 @@ class QueueCommandCog(commands.Cog):
         self.votes_cancel = {}
         self.vote_message = None
         self.channel_vote_maps = None
+        self.voice_channel_a = None
+        self.voice_channel_b = None
+
         super().__init__()
 
     @app_commands.command()
@@ -188,9 +193,10 @@ class QueueCommandCog(commands.Cog):
                 #     embed=embed_join_voting_maps(queue, self.channel_vote_maps))
 
                 await self.send_maps_vote_to_map()
-
                 await asyncio.sleep(30)
-                await self.print_map_with_most_votes()
+                map_winner = await self.print_map_with_most_votes()
+                await self.create_voice_channel(interact, queue)
+                await self.send_teams(queue, map_winner, self.black_security_service.get_random_key())
 
             await asyncio.sleep(10)
 
@@ -215,11 +221,6 @@ class QueueCommandCog(commands.Cog):
         print(self.button_queues.custom_id)
 
     async def create_channel_voting_maps(self, interact: discord.Interaction, queue: Queue):
-        guild = interact.guild
-        overwrites = {
-            guild.default_role: discord.PermissionOverwrite(read_messages=False),
-            guild.me: discord.PermissionOverwrite(read_messages=True),  # Garante que o bot possa ler mensagens
-        }
 
         for player in queue.get_all_players():
             self.player_service.save_player(
@@ -227,13 +228,43 @@ class QueueCommandCog(commands.Cog):
                        player.losses,
                        StatusQueue.IN_VOTING_MAPS))
 
+        channel = await interact.guild.create_text_channel(queue.id, overwrites=self.get_overwrites(interact, queue))
+        return channel
+
+    async def send_teams(self, queue, map_winner, key):
+        await self.channel_vote_maps.send(embed=team_mate_embed_message(queue.get_all_players(), self.voice_channel_a, self.voice_channel_b, map_winner, key))
+        self.black_security_service.remove_one_key(key)
+
+    async def create_voice_channel(self, interact, queue):
+        # guild = interact.guild
+        # overwrites = {
+        #     guild.default_role: discord.PermissionOverwrite(read_messages=False),
+        #     guild.me: discord.PermissionOverwrite(read_messages=True),  # Garante que o bot possa ler mensagens
+        # }
+        #
+        # for discord_user in queue.get_all_discord_users():
+        #     member = guild.get_member(discord_user.id)
+        #     if member:
+        #         overwrites[member] = discord.PermissionOverwrite(read_messages=True)
+
+        self.voice_channel_a = await interact.guild.create_voice_channel(f"PARTIDA 1 - Time A",
+                                                                         overwrites=self.get_overwrites(interact,
+                                                                                                        queue))
+        self.voice_channel_b = await interact.guild.create_voice_channel(f"PARTIDA 1 - Time B",
+                                                                         overwrites=self.get_overwrites(interact,
+                                                                                                        queue))
+
+    def get_overwrites(self, interact, queue):
+        guild = interact.guild
+        overwrites = {
+            guild.default_role: discord.PermissionOverwrite(read_messages=False),
+            guild.me: discord.PermissionOverwrite(read_messages=True),  # Garante que o bot possa ler mensagens
+        }
         for discord_user in queue.get_all_discord_users():
             member = guild.get_member(discord_user.id)
             if member:
                 overwrites[member] = discord.PermissionOverwrite(read_messages=True)
-
-        channel = await guild.create_text_channel(queue.id, overwrites=overwrites)
-        return channel
+        return overwrites
 
     async def send_maps_vote_to_map(self):
 
@@ -295,7 +326,6 @@ class QueueCommandCog(commands.Cog):
                 self.map_path_image_vote[id_user] = rf"maps/{map_button_id}.jpeg"
 
             embed = emebed_map_voted(map_button_id)
-
             await interact.response.send_message(content="Voto registrado", embed=embed, ephemeral=True)
 
         try:
@@ -319,7 +349,7 @@ class QueueCommandCog(commands.Cog):
         else:
             file = discord.File(rf"maps/{map_with_most_votes}.jpeg")
             await self.channel_vote_maps.send(file=file, embed=embed_map_wiiner(map_with_most_votes, max_votes))
-
+        return map_with_most_votes
             # await channel.send(f"O mapa escolhido é: {map_with_most_votes}, com {max_votes} votos.")
 
     def get_map_with_most_votes(self):

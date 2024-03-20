@@ -77,7 +77,7 @@ def queue_start_voting_maps_message(queue: Queue, channel):
     return embed
 
 
-def team_mate_embed_message(players, map):
+def team_mate_embed_message(players, channel_a, channel_b, map_winner, black_security_key):
     # Embaralhar os jogadores
     random.shuffle(players)
 
@@ -89,5 +89,9 @@ def team_mate_embed_message(players, map):
     embed.set_thumbnail(url="https://i.ibb.co/G3mkZ1p/Screenshot-from-2024-03-13-14-31-37.png")
     embed.add_field(name="TIME A", value=','.join([player.name for player in teammate_a]), inline=False)
     embed.add_field(name="TIME B", value=','.join([player.name for player in teammate_b]), inline=False)
-    embed.add_field(name="MAPA:", value=map, inline=False)
+    embed.add_field(name="MAPA:", value=map_winner, inline=False)
+    embed.add_field(name="CANAL DE VOZ TIME A:", value=f"https://discord.com/channels/{channel_a.guild.id}/{channel_a.id}", inline=False)
+    embed.add_field(name="CANAL DE VOZ TIME B:", value=f"https://discord.com/channels/{channel_b.guild.id}/{channel_b.id}", inline=False)
+    embed.add_field(name="BLACK SECURITY KEY:", value=f"**ID**: {black_security_key.id} -  **SENHA:** {black_security_key.password}", inline=False)
+
     return embed
