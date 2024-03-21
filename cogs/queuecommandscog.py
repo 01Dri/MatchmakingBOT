@@ -23,7 +23,7 @@ class QueueCommandCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.message_button_create = None
-        self.queue_service = QueueService(2)
+        self.queue_service = QueueService()
         self.buttons_queues_service = QueueButtonService(self.callback_button_queue)
         self.player_service = PlayerService()
         self.black_security_service = BlackSecurityService()
@@ -118,6 +118,7 @@ class QueueCommandCog(commands.Cog):
     #     return result
 
     async def callback_button_queue(self, interact: discord.Interaction):
+        print("CHAMOU O CALLBACK")
         self.queues_id = (str(interact.data['custom_id']))
         queues_id_parts = self.queues_id.split(" - ")
         queus_1 = self.queue_service.find_queue_by_id(queues_id_parts[0])
@@ -186,16 +187,16 @@ class QueueCommandCog(commands.Cog):
                 queue = self.queue_service.remove_full_queue(self.queue_service.find_full_queues())
                 await self.create_category(interact, queue)
                 new_queue = self.queue_service.create_queue(queue.rank, StatusQueue.DEFAULT)
+
                 self.update_new_queue_after_full_queue(new_queue)
-
-                self.match_service.add_match(
-                    Match(queue.id, self.channel_vote_maps, self.voice_channel_a, self.voice_channel_b, self.teammate_a,
-                          self.teammate_b))
-
-                await self.update_button_queue_message()
+                # await self.update_button_queue_message()
 
                 self.channel_vote_maps = await self.create_channel_voting_maps(interact, queue)
-                print(self.channel_vote_maps)
+
+                match = Match(queue.id, self.channel_vote_maps, None, None, None,
+                      None, None, None)
+                self.match_service.add_match(match)
+                await self.update_button_queue_message()
 
                 for user in queue.discord_users:
                     await self.embeds_message_join[user.name].edit(
@@ -206,8 +207,18 @@ class QueueCommandCog(commands.Cog):
                 map_winner = await self.print_map_with_most_votes()
                 await self.create_voice_channel(interact, queue, self.match_service.get_quantity_matches())
                 await self.send_teams(queue, map_winner, self.black_security_service.get_random_key())
-
+                self.update_attributes_match(match)
+                self.match_service.add_match(match)
+                print(self.match_service.get_matches())
             await asyncio.sleep(10)
+
+    def update_attributes_match(self, match):
+        match.voice_channel_teams_a = self.voice_channel_a
+        match.voice_channel_teams_b = self.voice_channel_b
+        match.team_a = self.teammate_a
+        match.team_b = self.teammate_b
+        match.category = self.queue_category
+        match.message_amount_matches = self.buttons_queues_service.message_button_create
 
     def update_new_queue_after_full_queue(self, queue: Queue):
         new_queue = self.queue_service.create_queue(queue.rank, StatusQueue.DEFAULT)
@@ -228,11 +239,10 @@ class QueueCommandCog(commands.Cog):
             embed=embed_queues_message(self.queue_service.get_quantity_players_on_queues(),
                                        self.match_service.get_quantity_matches()),
             view=self.buttons_queues_service.get_view())
-        print(self.button_queues.custom_id)
+        # print(self.button_queues.custom_id)
 
     async def create_category(self, interact, queue):
         self.queue_category = await interact.guild.create_category(queue.id)
-
 
     async def create_channel_voting_maps(self, interact: discord.Interaction, queue: Queue):
 
@@ -242,7 +252,9 @@ class QueueCommandCog(commands.Cog):
                        player.losses,
                        StatusQueue.IN_VOTING_MAPS))
 
-        channel = await self.queue_category.create_text_channel("Votação de mapas", overwrites=self.get_overwrites(interact, queue))
+        channel = await self.queue_category.create_text_channel("Votação de mapas",
+                                                                overwrites=self.get_overwrites(interact, queue))
+        # channel.
         return channel
 
     async def send_teams(self, queue, map_winner, key):
@@ -258,13 +270,13 @@ class QueueCommandCog(commands.Cog):
         self.black_security_service.remove_one_key(key)
 
     async def create_voice_channel(self, interact, queue, match_number):
-        self.voice_channel_a =  await self.queue_category.create_voice_channel(f"PARTIDA {match_number} - Time A",
-                                                                         overwrites=self.get_overwrites(interact,
-                                                                                                        queue))
+        self.voice_channel_a = await self.queue_category.create_voice_channel(f"PARTIDA {match_number} - Time A",
+                                                                              overwrites=self.get_overwrites(interact,
+                                                                                                             queue))
 
         self.voice_channel_b = await self.queue_category.create_voice_channel(f"PARTIDA {match_number} - Time B",
-                                                                     overwrites=self.get_overwrites(interact,
-                                                                                                    queue))
+                                                                              overwrites=self.get_overwrites(interact,
+                                                                                                             queue))
 
     def get_overwrites(self, interact, queue):
         guild = interact.guild
@@ -333,7 +345,7 @@ class QueueCommandCog(commands.Cog):
                 self.map_path_image_vote[id_user] = rf"maps/{map_button_id}.jpeg"
             else:
                 current_votes = self.maps_votes_record[map_button_id]
-                self.maps_votes_record[map_button_id] = current_votes + 1
+                self.maps_votes_record[map_button_id] += 1
                 self.maps_votes_users_record[id_user] = map_button_id
                 self.map_path_image_vote[id_user] = rf"maps/{map_button_id}.jpeg"
 

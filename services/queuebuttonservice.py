@@ -2,6 +2,12 @@ import discord
 
 
 class QueueButtonService:
+    # _instance = None
+    #
+    # def __new__(cls, *args, **kwargs):
+    #     if not cls._instance:
+    #         cls._instance = super().__new__(cls, *args, **kwargs)
+    #     return cls._instance
 
     def __init__(self, callback_button, message_button_create=None):
         self.view = discord.ui.View()
@@ -12,9 +18,11 @@ class QueueButtonService:
     def get_view(self):
         return self.view
 
-    def create_button_queue(self, label_button, custom_id):
+    def create_button_queue(self, label_button, custom_id=None):
         self.button = discord.ui.Button(label=label_button)
-        self.button.custom_id = custom_id
+        if custom_id is not None:
+            self.button.custom_id = custom_id
+
         self.button.callback = self.callback_button
         self.view.add_item(self.button)
         return self.button

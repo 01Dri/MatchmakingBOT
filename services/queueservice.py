@@ -16,9 +16,15 @@ from services.roleservice import RoleService
 
 
 class QueueService:
+    _instance = None
 
-    def __init__(self, max_players_for_queue):
-        self.max_players_for_queue = max_players_for_queue
+    def __new__(cls, *args, **kwargs):
+        if not cls._instance:
+            cls._instance = super().__new__(cls, *args, **kwargs)
+        return cls._instance
+
+    def __init__(self):
+        self.max_players_for_queue = 2
         self.view = discord.ui.View()
         self.queues_repository = QueueRepository()
         self.player_repository = PlayerRepository()
@@ -111,6 +117,7 @@ class QueueService:
 
     def get_all_id_queues(self):
         return self.queues_repository.get_all_queues_id()
+
     # async def remove_full_queues(self):
     #     full_queue = self.get_all_queues_to_remove()
     #     if full_queue:

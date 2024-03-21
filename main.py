@@ -16,6 +16,7 @@ bot = commands.Bot(command_prefix=".", intents=intents)
 async def load_cogs():
     await bot.load_extension("cogs.queuecommandscog")
     await bot.load_extension("cogs.blacksecuritycommandscog")
+    await bot.load_extension("cogs.matchcommandcog")
 
 
 @bot.event
@@ -24,9 +25,9 @@ async def on_ready():
     await bot.tree.sync()
 
 
-def add_command(command):
-    cmd = commands.Command(command)
-    bot.add_command(cmd)
+# def add_command(command):
+#     cmd = commands.Command(command)
+#     bot.add_command(cmd)
 
 
 bot.run(token)
