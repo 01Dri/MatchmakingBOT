@@ -131,7 +131,7 @@ class QueueCommandCog(commands.Cog):
             self.queue_rank_b = queus_1
 
         discord_id_player = str(interact.user.id)
-        player = self.player_service.find_player(discord_id_player)
+        player = self.player_service.find_player_by_discord_id(discord_id_player)
 
         if player is None:
             player = self.player_service.save_player(
@@ -184,6 +184,15 @@ class QueueCommandCog(commands.Cog):
             if len(self.queue_service.find_full_queues()) == 0:
                 pass
             else:
+                key = self.black_security_service.get_random_key()
+                if key is None:
+                    await interact.followup.send("NÃO FOI POSSIVEL INICIAR A PARTIDA, POIS NÃO FOI ENCONTRADA NENHUMA BLACK KEY!!!")
+                    queue = self.queue_service.remove_full_queue(self.queue_service.find_full_queues())
+                    new_queue = self.queue_service.create_queue(queue.rank, StatusQueue.DEFAULT)
+                    self.update_new_queue_after_full_queue(new_queue)
+                    await self.update_button_queue_message()
+                    return
+
                 queue = self.queue_service.remove_full_queue(self.queue_service.find_full_queues())
                 await self.create_category(interact, queue)
                 new_queue = self.queue_service.create_queue(queue.rank, StatusQueue.DEFAULT)
@@ -206,7 +215,7 @@ class QueueCommandCog(commands.Cog):
                 await asyncio.sleep(30)
                 map_winner = await self.print_map_with_most_votes()
                 await self.create_voice_channel(interact, queue, self.match_service.get_quantity_matches())
-                await self.send_teams(queue, map_winner, self.black_security_service.get_random_key())
+                await self.send_teams(queue, map_winner, key)
                 self.update_attributes_match(match)
                 self.match_service.add_match(match)
                 print(self.match_service.get_matches())

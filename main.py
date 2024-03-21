@@ -17,6 +17,7 @@ async def load_cogs():
     await bot.load_extension("cogs.queuecommandscog")
     await bot.load_extension("cogs.blacksecuritycommandscog")
     await bot.load_extension("cogs.matchcommandcog")
+    await bot.load_extension("cogs.playercommandcog")
 
 
 @bot.event

@@ -40,6 +40,7 @@ def embed_join_queue_message(queue: Queue):
 
     return embed
 
+
 def embed_join_voting_maps(queue: Queue, channel):
     players = ', '.join([player.name for player in queue.get_all_players()])
     embed = discord.Embed(title='MATCHMAKING VOTAÇÃO', description="VOTAÇÃO DE MAPAS INICIOU!!!", color=0xff0000)
@@ -51,6 +52,7 @@ def embed_join_voting_maps(queue: Queue, channel):
                     value=f"[{channel.name}](https://discord.com/channels/{channel.guild.id}/{channel.id})",
                     inline=False)
     return embed
+
 
 def queue_join_embed_message(player: Player, queue: Queue):
     embed = discord.Embed(title='MATCHMAKING FILA', description=player.name, color=0xff0000)
@@ -83,10 +85,29 @@ def team_mate_embed_message(channel_a, channel_b, map_winner, black_security_key
     embed.add_field(name="TIME A", value=','.join([player.name for player in team_a]), inline=False)
     embed.add_field(name="TIME B", value=','.join([player.name for player in team_b]), inline=False)
     embed.add_field(name="MAPA:", value=map_winner, inline=False)
-    embed.add_field(name="CANAL DE VOZ TIME A:", value=f"https://discord.com/channels/{channel_a.guild.id}/{channel_a.id}", inline=False)
-    embed.add_field(name="CANAL DE VOZ TIME B:", value=f"https://discord.com/channels/{channel_b.guild.id}/{channel_b.id}", inline=False)
+    embed.add_field(name="CANAL DE VOZ TIME A:",
+                    value=f"https://discord.com/channels/{channel_a.guild.id}/{channel_a.id}", inline=False)
+    embed.add_field(name="CANAL DE VOZ TIME B:",
+                    value=f"https://discord.com/channels/{channel_b.guild.id}/{channel_b.id}", inline=False)
     if black_security_key is None:
         embed.add_field(name="BLACK SECURITY KEY:", value=f"**NENHUMA KEY ENCONTRADA!!!**", inline=False)
     else:
-        embed.add_field(name="BLACK SECURITY KEY:", value=f"**ID**: {black_security_key.id} -  **SENHA:** {black_security_key.password}", inline=False)
+        embed.add_field(name="BLACK SECURITY KEY:",
+                        value=f"**ID**: {black_security_key.id} -  **SENHA:** {black_security_key.password}",
+                        inline=False)
     return embed
+
+
+def embed_profile_message(player: Player, user: discord.Interaction.user):
+    all_games = player.wins + player.losses
+    embed = discord.Embed(title='PERFIL', description=f"<@{player.discord_id}>", color=0xff0000)
+    embed.set_thumbnail(url=user.avatar.url)
+    embed.add_field(name="Vitórias", value=player.wins, inline=True)
+    embed.add_field(name="Derrotas", value=player.losses, inline=True)
+    embed.add_field(name="Pontos", value=player.points, inline=True)
+    winrate = 0 if all_games == 0 else (player.wins / all_games) * 100
+
+    embed.add_field(name="Winrate", value=f"{winrate:.0f}%" if winrate != 0 else "0%", inline=True)
+    embed.add_field(name="Rank", value=player.rank.name, inline=True)
+    return embed
+    # embed.add_field(name="Pontos", value=player.points, inline=True)

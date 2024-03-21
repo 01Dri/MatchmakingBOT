@@ -22,8 +22,8 @@ class MatchCommandCog(commands.Cog):
         self.player_service = PlayerService()
         self.queue_service = QueueService()
         self.button_service = QueueButtonService(self.callback_vote_cancel_button)
-        self.button_yes = self.button_service.create_button_queue("SIM", "sim")
-        self.button_no = self.button_service.create_button_queue("NÃO", "nao")
+        self.button_yes = self.button_service.create_button_queue("SIM", "sim", discord.ButtonStyle.green)
+        self.button_no = self.button_service.create_button_queue("NÃO", "nao", discord.ButtonStyle.red)
         self.message_button = None
         self.result = None
         self.votes = {}
@@ -42,8 +42,10 @@ class MatchCommandCog(commands.Cog):
             await interact.response.send_message("Já existe uma votação em andamento!", ephemeral=True)
             return
 
-        if self.votes.values() is not None:
+        if self.votes.values() is not None and self.votes_users.values() is not None:
             self.votes.clear()
+            self.votes_users.clear()
+
         await interact.response.send_message("Votação para cancelar a partida iniciada", ephemeral=True)
         self.message_button = await interact.followup.send("VOTAÇÃO PARA CANCELAR A PARTIDA: ",
                                                            view=self.button_service.get_view())

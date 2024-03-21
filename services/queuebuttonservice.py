@@ -18,8 +18,11 @@ class QueueButtonService:
     def get_view(self):
         return self.view
 
-    def create_button_queue(self, label_button, custom_id=None):
-        self.button = discord.ui.Button(label=label_button)
+    def create_button_queue(self, label_button, custom_id=None, style=None):
+        if style is not None:
+            self.button = discord.ui.Button(label=label_button, style=style)
+        else:
+            self.button = discord.ui.Button(label=label_button)
         if custom_id is not None:
             self.button.custom_id = custom_id
 

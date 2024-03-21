@@ -54,6 +54,17 @@ class PlayerRepository:
         # raise NotFoundPlayerException("Player não encontrado!!!")
         return None
 
+    def reset_all(self):
+        QUERY_UPDATE = """
+            UPDATE players
+            SET rank = ?, points = ?, wins = ?, losses = ?
+        """
+        cursor = self.get_cursor()
+        cursor.execute(QUERY_UPDATE, (Rank.RANK_B.value, 0, 0, 0))
+        self.conn.commit()
+        self.close_connections()
+        return True
+
     def get_cursor(self):
         self.conn = sqlite3.connect("match.db")
         return self.conn.cursor()
@@ -61,3 +72,4 @@ class PlayerRepository:
     def close_connections(self):
         self.cursor.close()
         self.conn.close()
+
