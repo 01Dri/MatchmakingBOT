@@ -10,7 +10,7 @@ class QueueButtonService:
     #     return cls._instance
 
     def __init__(self, callback_button, message_button_create=None):
-        self.view = discord.ui.View()
+        self.view = discord.ui.View(timeout=None)
         self.message_button_create = message_button_create
         self.callback_button = callback_button
         self.button = None

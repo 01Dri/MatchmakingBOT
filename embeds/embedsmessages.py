@@ -111,3 +111,17 @@ def embed_profile_message(player: Player, user: discord.Interaction.user):
     embed.add_field(name="Rank", value=player.rank.name, inline=True)
     return embed
     # embed.add_field(name="Pontos", value=player.points, inline=True)
+
+
+def team_wins_embed(points_win, time_win, points_losse, time_losse):
+    embed = discord.Embed(title='MATCHMAKING VITORIA', description="", color=0xff0000)
+    embed.set_thumbnail(url="https://i.ibb.co/G3mkZ1p/Screenshot-from-2024-03-13-14-31-37.png")
+    embed.add_field(name=f"TIME VENCEDOR:", value=[player.name for player in time_win], inline=False)
+    embed.add_field(name=f"PONTOS RECEBIDOS:", value=points_win, inline=False)
+    embed.add_field(name=f"TIME PERDEDOR:", value=[player.name for player in time_losse], inline=False)
+    embed.add_field(name=f"PONTOS PERDIDOS:", value=points_losse, inline=False)
+
+    # embed.add_field(name="CANAL PARA VOTAÇÃO DOS MAPS:",
+    #                 value=f"[{channel.name}](https://discord.com/channels/{channel.guild.id}/{channel.id})",
+    #                 inline=False)
+    return embed

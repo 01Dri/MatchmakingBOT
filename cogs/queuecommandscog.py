@@ -5,7 +5,7 @@ import discord.ui
 from discord import app_commands
 from discord.ext import commands
 from embeds.embedsmessages import embed_queues_message, embed_join_queue_message, emebed_map_voted, embed_map_wiiner, \
-    embed_join_voting_maps, team_mate_embed_message
+    embed_join_voting_maps, team_mate_embed_message, team_wins_embed
 from entities.Match import Match
 from entities.Player import Player
 from entities.Queue import Queue
@@ -47,14 +47,15 @@ class QueueCommandCog(commands.Cog):
         self.teammate_a = []
         self.teammate_b = []
         self.queue_category = None
-
+        self.interact: discord.Interaction = None
+        self.votes_end_user = {}
+        self.votes_end = {}
+        self.view_end = None
+        self.message_end = None
         super().__init__()
 
     @app_commands.command()
     async def iniciarfila(self, interact: discord.Interaction):
-        ## Verificando a cada segundo filas que podem estar cheias, ou seja. filas que devem ser inicializadas!!!
-        self.bot.loop.create_task(self.check_full_queues(interact))
-
         if self.queue_service.get_quantity_queue() == 0:
             self.queue_rank_a = self.queue_service.create_queue(Rank.RANK_A, StatusQueue.DEFAULT)
             self.queue_rank_b = self.queue_service.create_queue(Rank.RANK_B, StatusQueue.DEFAULT)
@@ -63,7 +64,9 @@ class QueueCommandCog(commands.Cog):
         else:
             await interact.response.send_message("FILAS JÁ INICIADAS!!!")
             return
+
         await interact.response.send_message("Você iniciou as filas", ephemeral=True)
+
         self.buttons_queues_service.message_button_create = await interact.followup.send(
             embed=embed_queues_message(self.queue_service.get_quantity_players_on_queues(),
                                        self.match_service.get_quantity_matches()),
@@ -77,48 +80,13 @@ class QueueCommandCog(commands.Cog):
             self.buttons_queues_service.clear_view()
             await self.buttons_queues_service.delete_message_button()
             await interact.response.send_message("Filas canceladas!!!", view=self.buttons_queues_service.get_view())
-            print(f"QUANTIDADE DE FILAS APÓS REMOÇÃO: {self.queue_service.get_quantity_queue()}")
             return
         await interact.response.send_message("NÃO EXISTEM FILAS PARA SER REMOVIDAS!!!", ephemeral=True)
 
-    # @app_commands.command()
-    # async def cancelarpartida(self, interact: discord.Interaction):
-    #     channel_command = interact.channel
-    #     queue_id_by_channel_name = channel_command.name
-    #     if queue_id_by_channel_name in self.queue_service.get_all_id_queues():
-    #         current_queue = self.queue_service.find_queue_by_id(queue_id_by_channel_name)
-    #         self.queue_service.remove_queue_by_id(current_queue.id)
-    #         button_yes_cancel = discord.ui.Button(style=discord.ButtonStyle.green, label="Sim")
-    #         button_yes_cancel.custom_id = "sim"
-    #         button_no_cancel = discord.ui.Button(style=discord.ButtonStyle.red, label="Não")
-    #         button_yes_cancel.custom_id = "nao"
-    #         view = discord.ui.View()
-    #         view.add_item(button_yes_cancel)
-    #         view.add_item(button_no_cancel)
-    #         await interact.response.send_message("VOTAÇÃO PARA ENCERRAR A PARTIDA: ", view=view, ephemeral=False)
-    #         return
-    #     await interact.response.send_message("Nenhuma fila encontrada nesse canal!!!", ephemeral=True)
-
-    # async def callback_cancel_match(self, interact: discord.Interaction):
-    #     id_button = str(interact.data['custom_id'])
-    #     self.votes_cancel[id_button] += 1
-    #
-    #     async def get_result_cancel():
-    #         if not self.votes_cancel:
-    #             return None
-    #
-    #     max_votes = max(self.votes_cancel.values())
-    #     result = None
-    #
-    #     for vote_id, votes in self.votes_cancel.items():
-    #         if votes == max_votes:
-    #             result = vote_id
-    #             break
-    #
-    #     return result
-
     async def callback_button_queue(self, interact: discord.Interaction):
-        print("CHAMOU O CALLBACK")
+        self.bot.loop.create_task(self.check_full_queues())
+
+        self.interact = interact
         self.queues_id = (str(interact.data['custom_id']))
         queues_id_parts = self.queues_id.split(" - ")
         queus_1 = self.queue_service.find_queue_by_id(queues_id_parts[0])
@@ -132,12 +100,10 @@ class QueueCommandCog(commands.Cog):
 
         discord_id_player = str(interact.user.id)
         player = self.player_service.find_player_by_discord_id(discord_id_player)
-
         if player is None:
             player = self.player_service.save_player(
                 Player(None, discord_id_player, str(interact.user.name), Rank.RANK_B, 0, 0, 0,
                        StatusQueue.DEFAULT))
-        print(player.queue_status)
 
         current_queue_user = self.queue_service.find_current_queue_player(player)
         if player is not None and player.queue_status == StatusQueue.IN_VOTING_MAPS.value:
@@ -151,7 +117,6 @@ class QueueCommandCog(commands.Cog):
                     if embed_user:
                         await embed_user.delete()
                     await interact.response.send_message("Você saiu da fila!!!", ephemeral=True)
-                    print(f"PLAYERS NA FILA: {current_queue_user.get_all_players()}")
                     await self.buttons_queues_service.message_button_create.edit(
                         embed=embed_queues_message(self.queue_service.get_quantity_players_on_queues(),
                                                    self.match_service.get_quantity_matches()))
@@ -164,10 +129,8 @@ class QueueCommandCog(commands.Cog):
 
         await interact.response.send_message("Você entrou na fila!!!", ephemeral=True)
 
-        # Cria um novo embed para o usuário e armazena a referência a ele
         embed = embed_join_queue_message(current_queue_user)
         self.embeds_message_join[interact.user.name] = await interact.followup.send(embed=embed, ephemeral=True)
-        print(f"PLAYERS NA FILA: {current_queue_user.get_all_players()}")
         await self.buttons_queues_service.message_button_create.edit(
             embed=embed_queues_message(self.queue_service.get_quantity_players_on_queues(),
                                        self.match_service.get_quantity_matches()))
@@ -176,34 +139,32 @@ class QueueCommandCog(commands.Cog):
             Player(None, discord_id_player, str(interact.user.name), player.rank, player.points, player.wins,
                    player.losses,
                    StatusQueue.IN_QUEUE))
-        # await self.buttons_queues_service.message_button_create.edit(embed=embed_queues_message(self.queue_service.get_quantity_players_on_queues())
 
-    async def check_full_queues(self, interact):
-        guild = interact.guild
+    async def check_full_queues(self):
         while True:
             if len(self.queue_service.find_full_queues()) == 0:
                 pass
             else:
                 key = self.black_security_service.get_random_key()
                 if key is None:
-                    await interact.followup.send("NÃO FOI POSSIVEL INICIAR A PARTIDA, POIS NÃO FOI ENCONTRADA NENHUMA BLACK KEY!!!")
                     queue = self.queue_service.remove_full_queue(self.queue_service.find_full_queues())
                     new_queue = self.queue_service.create_queue(queue.rank, StatusQueue.DEFAULT)
                     self.update_new_queue_after_full_queue(new_queue)
                     await self.update_button_queue_message()
+                    adm_role = self.interact.guild.get_role(1126973920252280912)
+                    await self.interact.followup.send(
+                        f"NÃO FOI POSSÍVEL INICIAR A PARTIDA, POIS NÃO FOI ENCONTRADA NENHUMA BLACK KEY!!! <@&{adm_role.id}>")
                     return
 
                 queue = self.queue_service.remove_full_queue(self.queue_service.find_full_queues())
-                await self.create_category(interact, queue)
+                await self.create_category(self.interact, queue)
                 new_queue = self.queue_service.create_queue(queue.rank, StatusQueue.DEFAULT)
-
                 self.update_new_queue_after_full_queue(new_queue)
-                # await self.update_button_queue_message()
 
-                self.channel_vote_maps = await self.create_channel_voting_maps(interact, queue)
+                self.channel_vote_maps = await self.create_channel_voting_maps(self.interact, queue)
 
                 match = Match(queue.id, self.channel_vote_maps, None, None, None,
-                      None, None, None)
+                              None, None, None)
                 self.match_service.add_match(match)
                 await self.update_button_queue_message()
 
@@ -214,13 +175,33 @@ class QueueCommandCog(commands.Cog):
                 await self.send_maps_vote_to_map()
                 await asyncio.sleep(30)
                 map_winner = await self.print_map_with_most_votes()
-                await self.create_voice_channel(interact, queue, self.match_service.get_quantity_matches())
+                await self.create_voice_channel(self.interact, queue, self.match_service.get_quantity_matches())
                 await self.send_teams(queue, map_winner, key)
                 self.update_attributes_match(match)
                 self.match_service.add_match(match)
-                print(self.match_service.get_matches())
-            await asyncio.sleep(10)
 
+                if "a" not in self.votes_end.keys() or "b" not in self.votes_end.keys():
+                    self.votes_end["a"] = 0
+                    self.votes_end["b"] = 0
+
+                await self.voting_end_match()
+                while await self.get_result_votes_end(self.interact) is None:
+                    self.votes_end.clear()
+                    self.votes_end_user.clear()
+                    if "a" not in self.votes_end.keys() or "b" not in self.votes_end.keys():
+                        self.votes_end["a"] = 0
+                        self.votes_end["b"] = 0
+                    print("REGISTRO DE VOTAÇÃO LIMPOS")
+                    if self.message_end is not None:
+                        print(self.message_end)
+                        await self.message_end.edit(
+                            content="VOTAÇÃO STATUS: Não foi possivel determinar a equipe vencedora, por favor vote novamente!")
+
+                    await asyncio.sleep(30)
+                await self.update_button_queue_message()
+
+                # print(self.match_service.get_matches())
+            await asyncio.sleep(10)
     def update_attributes_match(self, match):
         match.voice_channel_teams_a = self.voice_channel_a
         match.voice_channel_teams_b = self.voice_channel_b
@@ -323,7 +304,7 @@ class QueueCommandCog(commands.Cog):
             discord.ui.Button(style=discord.ButtonStyle.primary, label=map_name) for map_name in maps
         ]
 
-        view = discord.ui.View()
+        view = discord.ui.View(timeout=None)
         for b, map_name in zip(buttons, maps):
             b.custom_id = map_name
             b.callback = self.map_button_vote_callback
@@ -353,7 +334,6 @@ class QueueCommandCog(commands.Cog):
                 self.maps_votes_users_record[id_user] = map_button_id
                 self.map_path_image_vote[id_user] = rf"maps/{map_button_id}.jpeg"
             else:
-                current_votes = self.maps_votes_record[map_button_id]
                 self.maps_votes_record[map_button_id] += 1
                 self.maps_votes_users_record[id_user] = map_button_id
                 self.map_path_image_vote[id_user] = rf"maps/{map_button_id}.jpeg"
@@ -398,6 +378,118 @@ class QueueCommandCog(commands.Cog):
                 break
 
         return map_with_most_votes
+
+    async def voting_end_match(self):
+        self.view_end = discord.ui.View(timeout=None)
+        self.buttons_queues_service.callback_button = self.callback_voting_end_button
+        voting_end_button_yes = self.buttons_queues_service.create_button_queue("TIME A", "a")
+        voting_end_button_no = self.buttons_queues_service.create_button_queue("TIME B", "b")
+
+        self.view_end.add_item(voting_end_button_yes)
+        self.view_end.add_item(voting_end_button_no)
+        await self.channel_vote_maps.send("VOTAÇÃO EQUIPE VENCEDORA:", view=self.view_end)
+        # self.message_end = await self.channel_vote_maps.send("RESULTADO STATUS: VOTAÇÃO EM ANDAMENTO", ephemeral=True)
+        # self.message_end = await self.channel_vote_maps.send("RESULTADO: ")
+
+    async def callback_voting_end_button(self, interact: discord.Interaction):
+        button_id = str(interact.data['custom_id'])
+        user = str(interact.user.name)
+
+        if user in self.votes_end_user.keys() and self.votes_end_user[user] != button_id:
+            await interact.response.send_message("Você já votou!!!", ephemeral=True)
+            return
+
+        else:
+            self.votes_end[button_id] += 1
+            self.votes_end_user[user] = button_id
+            await interact.response.send_message(f"Você votou em {button_id}", ephemeral=True)
+            if self.message_end is None:
+                self.message_end = await interact.followup.send("RESULTADO STATUS: VOTAÇÃO EM ANDAMENTO")
+            # self.message_end = await interact.followup.send("RESULTADO STATUS: VOTAÇÃO EM ANDAMENTO", ephemeral=True)
+            return
+
+    async def get_result_votes_end(self, interact: discord.Interaction):
+        if self.votes_end['a'] >= 2:
+            # await asyncio.sleep(20)
+            await self.channel_vote_maps.send(embed=team_wins_embed(3, self.teammate_a, -2, self.teammate_b))
+            await asyncio.sleep(20)
+            for player_win in self.teammate_a:
+                new_points = player_win.points + 3
+                new_wins = player_win.wins + 1
+                if new_points >= 150:
+                    new_rank = Rank.RANK_A
+                    self.player_service.save_player(
+                        Player(player_win.id, player_win.discord_id, player_win.name, new_rank, 0, new_wins,
+                               player_win.losses, StatusQueue.DEFAULT))
+                else:
+                    self.player_service.save_player(
+                        Player(player_win.id, player_win.discord_id, player_win.name, player_win.rank, new_points, new_wins,
+                               player_win.losses, StatusQueue.DEFAULT))
+
+            for player_losse in self.teammate_b:
+                new_points = player_losse.points - 2
+                new_losses = player_losse.losses + 1
+                new_rank = player_losse.rank
+                if new_points < 0:
+                    new_points = 0
+                if player_losse.rank == Rank.RANK_A and new_points < 150:
+                    new_rank = Rank.RANK_B
+
+                self.player_service.save_player(
+                    Player(player_losse.id, player_losse.discord_id, player_losse.name, new_rank, new_points, player_losse.wins,
+                           new_losses, StatusQueue.DEFAULT))
+
+            await self.queue_category.delete()
+            await self.channel_vote_maps.delete()
+            await self.voice_channel_a.delete()
+            await self.voice_channel_b.delete()
+            match = self.match_service.find_match_by_id(self.queue_category.name)
+            self.match_service.remove_match(match)
+
+            return True
+        elif self.votes_end['b'] >= 2:
+            await self.channel_vote_maps.send(embed=team_wins_embed(3, self.teammate_b, -2, self.teammate_a))
+            await asyncio.sleep(20)
+            for player in self.teammate_b:
+                print(player.name)
+                player_points = player.points
+                new_losses = player.losses + 1
+                if player_points != 0:
+                    player_points = player_points - 2
+                if player.rank == Rank.RANK_A and player_points <= 150:
+                    new_rank = Rank.RANK_B
+                    self.player_service.save_player(
+                        Player(player.id, player.discord_id, player.name, new_rank, 0, player.wins,
+                               new_losses, StatusQueue.DEFAULT))
+                else:
+                    self.player_service.save_player(
+                        Player(player.id, player.discord_id, player.name, player.rank, player_points, player.wins,
+                               new_losses, StatusQueue.DEFAULT))
+
+            for player_losse in self.teammate_a:
+                new_points = player_losse.points - 2
+                new_losses = player_losse.losses + 1
+                new_rank = player_losse.rank
+                if new_points < 0:
+                    new_points = 0
+                if player_losse.rank == Rank.RANK_A and new_points < 150:
+                    new_rank = Rank.RANK_B
+
+                self.player_service.save_player(
+                    Player(player_losse.id, player_losse.discord_id, player_losse.name, new_rank, new_points,
+                           player_losse.win,
+                           new_losses, StatusQueue.DEFAULT))
+
+            await self.queue_category.delete()
+            await self.channel_vote_maps.delete()
+            await self.voice_channel_a.delete()
+            await self.voice_channel_b.delete()
+            match = self.match_service.find_match_by_id(self.queue_category.name)
+            self.match_service.remove_match(match)
+            return True
+
+        # await interact.response.send_message("Não houve um vencedor, a votação será reiniciada!!!")
+        return None
 
 
 async def setup(bot):
