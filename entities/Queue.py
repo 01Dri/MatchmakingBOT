@@ -54,7 +54,6 @@ class Queue:
     def remove_player_by_discord_id(self, discord_id: str):
         for p in self.players_on_queue:
             if p.discord_id == discord_id:
-                print("player removido")
                 self.players_on_queue.remove(p)
                 return True
         return False

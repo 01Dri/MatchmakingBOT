@@ -11,6 +11,7 @@ from exceptions.exceptions import InvalidRankPlayerException, CrowdedQueueExcept
 from repositories.QueueRepository import QueueRepository
 from repositories.playerrepository import PlayerRepository
 from services.channelservice import ChannelService
+from services.playerservice import PlayerService
 from services.queuebuttonservice import QueueButtonService
 from services.roleservice import RoleService
 
@@ -27,17 +28,35 @@ class QueueService:
         self.max_players_for_queue = 2
         self.view = discord.ui.View()
         self.queues_repository = QueueRepository()
-        self.player_repository = PlayerRepository()
-        # self.role_service = RoleService(guild)
-        # self.channel_service = ChannelService(guild)
-        self.message_join_embed = None
-        self.queue_rank_a = None
-        self.queue_rank_b = None
+        self.player_service = PlayerService()
+        self.queue_rank_a: Queue = None
+        self.queue_rank_b: Queue = None
+        self.queues_id = None
 
     def create_queue(self, rank, status) -> Queue:
         queue = Queue(str(uuid.uuid4()), rank, self.max_players_for_queue, status)
         self.queues_repository.save_queue(queue)
         return queue
+
+    def start_queues(self):
+        if self.get_quantity_queue() >= 2:
+            return False
+        self.queue_rank_a = self.create_queue(Rank.RANK_A, StatusQueue.DEFAULT)
+        self.queue_rank_b = self.create_queue(Rank.RANK_B, StatusQueue.DEFAULT)
+        self.queues_id = f"{self.queue_rank_a.id} - {self.queue_rank_b.id}"
+
+    def close_queues(self):
+        try:
+            self.queues_repository.remove_queue(self.queue_rank_a)
+            self.queues_repository.remove_queue(self.queue_rank_b)
+        except:
+            return False
+
+    def get_queues_id(self):
+        return self.queues_id
+
+    def set_queues_id(self, queues_id):
+        self.queues_id = queues_id
 
     def find_current_queue_player(self, player: Player):
         return self.queues_repository.get_current_queue_user_by_discord_id(player.discord_id)
@@ -51,9 +70,16 @@ class QueueService:
     def get_quantity_queue(self):
         return self.queues_repository.get_amount_queue()
 
-    def add_player_on_queue(self, player: Player, queue: Queue, user):
-        queue.add_player_queue(player, user)
-        return queue
+    def add_player_on_queue(self, player: Player, user):
+
+        if player.rank == self.queue_rank_a.rank:
+            print("ENTROU NA QUEUE A")
+            self.queue_rank_a.add_player_queue(player, user)
+            return self.queue_rank_a
+        else:
+            print("ENTROU NA QUEUE B")
+            self.queue_rank_b.add_player_queue(player, user)
+            return self.queue_rank_b
 
     def remove_player_on_queue_by_discord_id(self, discord_id: str):
         for queue in self.queues_repository.get_all_queues():
@@ -95,7 +121,6 @@ class QueueService:
         queues_full = []
         for queue in self.queues_repository.get_all_queues():
             if queue.get_amount_players() == self.max_players_for_queue:
-                print(f"QUEUES LOTADAS: {queue}")
                 queues_full.append(queue)
         return queues_full
 
@@ -105,7 +130,6 @@ class QueueService:
 
     def remove_full_queue(self, list_queues_full: [Queue]):
         for queue_full in list_queues_full:
-            print(f"QUEUES LOTADAS QUE VAO SER APAGADAS: {queue_full.id}")
             self.queues_repository.remove_queue(queue_full)
             return queue_full
 

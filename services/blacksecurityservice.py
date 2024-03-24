@@ -12,13 +12,6 @@ class BlackSecurityService:
         self.black_security_repository = BlackSecurityRepository()
 
     def save_key(self, key: str):
-        # split = key.split(" - ")
-        # keys_to_send = []
-        # for value in split:
-        #     splits = value.split(",")
-        #     keys_to_send.append(Key(splits[0], splits[1]))
-        #     # keys[splits[0]] = splits[1]
-
         self.black_security_repository.save_many_keys(self.format_key_str_to_key(key))
 
     def get_keys(self, num_keys: int):

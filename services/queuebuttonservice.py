@@ -1,5 +1,7 @@
 import discord
 
+from embeds.embedsmessages import embed_queues_message
+
 
 class QueueButtonService:
     # _instance = None
@@ -30,6 +32,13 @@ class QueueButtonService:
         self.view.add_item(self.button)
         return self.button
 
+    async def update_message_queue(self, players, matches):
+        await self.message_button_create.edit(
+            embed=embed_queues_message(players, matches))
+
+    def get_message_queues_button(self):
+        return self.message_button_create
+
     def get_view_buttons(self):
         return self.view
 
@@ -50,3 +59,21 @@ class QueueButtonService:
 
         # Adiciona o novo botão à view
         self.view.add_item(self.button)
+
+    def set_message_button_queues_created(self, message):
+        self.message_button_create = message
+
+    async def update_message_button_queues(self, message):
+
+        await self.message_button_create.edit(embed=message)
+
+    async def update_custom_id_button_queues(self, new_id, callback):
+        new_button = discord.ui.Button(label="Entrar/Sair")
+        new_button.custom_id = new_id
+        self.view.clear_items()
+        self.view.add_item(new_button)
+        new_button.callback = callback
+        await self.message_button_create.edit(view=self.view)
+
+    def get_message_button_queues(self):
+        return self.message_button_create

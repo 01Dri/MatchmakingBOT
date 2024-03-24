@@ -21,6 +21,8 @@ async def load_cogs():
     await bot.load_extension("cogs.blacksecuritycommandscog")
     await bot.load_extension("cogs.matchcommandcog")
     await bot.load_extension("cogs.playercommandcog")
+    await bot.load_extension("cogs.queuecommandcog")
+
 
 
 @bot.event
@@ -32,7 +34,7 @@ async def on_ready():
 @bot.command()
 async def loadcogs(ctx):
     await bot.tree.sync()
-    # await load_cogs()
+    await load_cogs()
     await ctx.send("Comandos carregados!!!")
 
 

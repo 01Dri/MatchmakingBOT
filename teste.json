@@ -1,0 +1,12 @@
+{
+  "123123": {
+    "arkana": {
+      "votos": 3,
+      "pessoas": ["diego", "carlos", "mel"]
+    },
+    "tokyo": {
+      "votos": 2,
+      "pessoas": ["joao", "gabriel"]
+    }
+  }
+}
