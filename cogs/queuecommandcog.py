@@ -16,6 +16,7 @@ from services.messageservices import MessageService
 from services.playerservice import PlayerService
 from services.queuebuttonservice import QueueButtonService
 from services.queueservice import QueueService
+from services.votesendservices import VotesEndService
 from services.votesmapsservice import VotesMapsServices
 
 
@@ -29,6 +30,8 @@ class QueueCommandsCog(commands.Cog):
         self.message_service = MessageService()
         self.black_security_service = BlackSecurityService()
         self.votes_maps_service = VotesMapsServices()
+        self.votes_end_service = VotesEndService()
+        self.vote_end_message_reference = {}
 
     @app_commands.command()
     async def startqueue(self, interact: discord.Interaction):
@@ -88,14 +91,25 @@ class QueueCommandsCog(commands.Cog):
         category_queue_session = await self.create_category_channels(interact, queue)
         channel_a, channel_b = await self.create_voices_channels(interact, category_queue_session, queue)
         await self.update_message_join_queue(self.message_service.get_channel_session_voting_maps(queue), queue)
-        self.update_match(match, channel_a, channel_b, category_queue_session, queue, team_a, team_b)
+        match = self.update_match(match, channel_a, channel_b, category_queue_session, queue, team_a, team_b)
+        await self.button_service.update_message_button_queues(
+            embed_queues_message(self.queue_service.get_quantity_players_on_queues(),
+                                 self.match_service.get_quantity_matches()))
         await self.message_service.send_maps_vote_to_channel(queue, self.vote_maps_callback_button)
         await asyncio.sleep(15)
         map_winner = self.votes_maps_service.get_map_with_max_votes(queue)
         channel_maps = self.message_service.get_channel_session_voting_maps(queue)
         await self.send_winner_map_to_channel(queue, map_winner, channel_maps)
+        await self.message_service.delete_message_button_maps(queue)
         await self.send_teams_to_channel(map_winner, key, channel_a, channel_b, team_a, team_b, channel_maps)
         await self.send_voting_end_match_to_channel(self.message_service.get_channel_session_voting_maps(queue))
+        while self.votes_end_service.get_result_voting(queue.id) is None:
+            await asyncio.sleep(20)
+        else:
+            await self.match_service.send_points_to_users(match.id, self.votes_end_service.get_result_voting(queue.id),
+                                                          self.vote_end_message_reference)
+            await asyncio.sleep(40)
+            await self.match_service.remove_attributes_on_match(match)
 
     async def send_voting_end_match_to_channel(self, channel):
         view_end = discord.ui.View(timeout=None)
@@ -108,12 +122,21 @@ class QueueCommandsCog(commands.Cog):
         await channel.send("VOTAÇÃO EQUIPE VENCEDORA:", view=view_end)
 
     async def vote_end_callback_button(self, interact: discord.Interaction):
+        vote = str(interact.data['custom_id'])
+        if self.votes_end_service.add_vote(interact.channel.category.name, vote, interact.user.name) is False:
+            await interact.response.send_message("Você já votou!", ephemeral=True)
+            self.vote_end_message_reference[interact.user.name] = await interact.followup.send(
+                "STATUS VOTAÇÃO: EM ANDAMENTO!", ephemeral=True)
 
-        return
+            return
+        await interact.response.send_message(f"Você votou em {vote}", ephemeral=True)
+        self.vote_end_message_reference[interact.user.name] = await interact.followup.send(
+            "STATUS VOTAÇÃO: EM ANDAMENTO!", ephemeral=True)
 
     async def vote_maps_callback_button(self, interact: discord.Interaction):
         map_button_id = str(interact.data['custom_id'])
-        if self.votes_maps_service.add_vote(map_button_id, interact.user.name, interact.channel.category.name) is False:
+        category_channel_name = str(interact.channel.category.name)
+        if self.votes_maps_service.add_vote(map_button_id, interact.user.name, category_channel_name) is False:
             await interact.response.send_message("VOcê já votou!", ephemeral=True)
             return
         await interact.response.send_message(f"Você votou no {map_button_id}", ephemeral=True)
@@ -152,12 +175,13 @@ class QueueCommandsCog(commands.Cog):
         match.team_b = team_b
         match.category = category_queue_session
         self.match_service.add_match(match)
+        return match
 
     def create_match(self, queue):
         # team_a, team_b = self.create_teams_match(queue)
         match = Match(queue.id, None, None, None, None,
                       None, None,
-                      self.button_service.get_message_queues_button())
+                      self.button_service.get_message_queues_button(), queue.rank)
         return match
 
     async def update_message_join_queue(self, channel, queue):
@@ -244,7 +268,6 @@ class QueueCommandsCog(commands.Cog):
         await self.button_service.update_message_button_queues(
             embed_queues_message(self.queue_service.get_quantity_players_on_queues(),
                                  self.match_service.get_quantity_matches()))
-        print(self.message_service.embed_message_join_queue_references.keys())
 
     def get_queues_id_by_button_queue(self, queus_id):
         queues_split = queus_id.split(" - ")

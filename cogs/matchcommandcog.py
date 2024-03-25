@@ -77,6 +77,9 @@ class MatchCommandCog(commands.Cog):
         await self.message_button.delete()
         self.message_button = None
 
+    # @app_commands.command()
+    # async def vencedor
+
     async def remove_attributes_on_match(self, match: Match):
         await match.category.delete()
         await match.voice_channel_teams_a.delete()

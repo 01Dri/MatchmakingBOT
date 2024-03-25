@@ -5,7 +5,7 @@ import discord.ui
 from discord import app_commands
 from discord.ext import commands
 from embeds.embedsmessages import embed_queues_message, embed_join_queue_message, emebed_map_voted, embed_map_wiiner, \
-    embed_join_voting_maps, team_mate_embed_message, team_wins_embed
+    embed_join_voting_maps, team_mate_embed_message
 from entities.Match import Match
 from entities.Player import Player
 from entities.Queue import Queue
@@ -335,28 +335,29 @@ class QueueCommandCog(commands.Cog):
         await self.channel_vote_maps_references[queue.id].send("VOTAÇÃO EQUIPE VENCEDORA:", view=self.view_end)
 
     async def callback_voting_end_button(self, interact: discord.Interaction):
-        button_id = str(interact.data['custom_id'])
-        user = str(interact.user.name)
-
-        if "a" not in self.votes_end.keys() or "b" not in self.votes_end.keys():
-            self.votes_end["a"] = 0
-            self.votes_end["b"] = 0
-
-        self.votes_end_records[interact.channel.category.name] = self.votes_end
-        if user in self.votes_end_user_records[interact.channel.category.name].keys() and \
-                self.votes_end_user_records[interact.channel.category.name][user] != button_id:
-            await interact.response.send_message("Você já votou!!!", ephemeral=True)
-            return
-
-        else:
-            self.votes_end_records[interact.channel.category][button_id] += 1
-            self.votes_end_user_records[interact.channel.category][user] = button_id
-            await interact.response.send_message(f"Você votou em {button_id}", ephemeral=True)
-
-            if self.message_end is None:
-                self.message_end = await interact.followup.send("RESULTADO STATUS: VOTAÇÃO EM ANDAMENTO")
-            # self.message_end = await interact.followup.send("RESULTADO STATUS: VOTAÇÃO EM ANDAMENTO", ephemeral=True)
-            return
+        return
+    #     button_id = str(interact.data['custom_id'])
+    #     user = str(interact.user.name)
+    #
+    #     if "a" not in self.votes_end.keys() or "b" not in self.votes_end.keys():
+    #         self.votes_end["a"] = 0
+    #         self.votes_end["b"] = 0
+    #
+    #     self.votes_end_records[interact.channel.category.name] = self.votes_end
+    #     if user in self.votes_end_user_records[interact.channel.category.name].keys() and \
+    #             self.votes_end_user_records[interact.channel.category.name][user] != button_id:
+    #         await interact.response.send_message("Você já votou!!!", ephemeral=True)
+    #         return
+    #
+    #     else:
+    #         self.votes_end_records[interact.channel.category][button_id] += 1
+    #         self.votes_end_user_records[interact.channel.category][user] = button_id
+    #         await interact.response.send_message(f"Você votou em {button_id}", ephemeral=True)
+    #
+    #         if self.message_end is None:
+    #             self.message_end = await interact.followup.send("RESULTADO STATUS: VOTAÇÃO EM ANDAMENTO")
+    #         # self.message_end = await interact.followup.send("RESULTADO STATUS: VOTAÇÃO EM ANDAMENTO", ephemeral=True)
+    #         return
 
     async def get_result_votes_end(self, max_votes, queue, team_a, team_b, voice_a, voice_b):
 

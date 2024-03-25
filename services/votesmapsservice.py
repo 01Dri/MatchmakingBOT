@@ -59,7 +59,7 @@ class VotesMapsServices:
         if len(map_winners) == 0:
             return self.get_random_map()  # Ninguem votou, então um mapa aleatorio foi escolhido
 
-        del self.session_votes[queue_id] # APAGA A SESSÃO DE VOTOS DESSA QUEUE
+        del self.session_votes[queue_id]  # APAGA A SESSÃO DE VOTOS DESSA QUEUE
         return map_winners[0]  # RETORNA O UNICO MAPA ESCOLHIDO
 
     def get_result_map_from_draw(self, maps):
@@ -100,3 +100,4 @@ class VotesMapsServices:
                         return True
         except:
             return None
+

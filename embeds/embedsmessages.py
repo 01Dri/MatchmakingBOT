@@ -113,15 +113,21 @@ def embed_profile_message(player: Player, user: discord.Interaction.user):
     # embed.add_field(name="Pontos", value=player.points, inline=True)
 
 
-def team_wins_embed(points_win, time_win, points_losse, time_losse):
-    embed = discord.Embed(title='MATCHMAKING VITORIA', description="", color=0xff0000)
+def win_embed_message(player, points):
+    embed = discord.Embed(title='MATCHMAKING VITORIA', description="SEU TIME VENCEU!!!", color=0xff0000)
     embed.set_thumbnail(url="https://i.ibb.co/G3mkZ1p/Screenshot-from-2024-03-13-14-31-37.png")
-    embed.add_field(name=f"TIME VENCEDOR:", value=[player.name for player in time_win], inline=False)
-    embed.add_field(name=f"PONTOS RECEBIDOS:", value=points_win, inline=False)
-    embed.add_field(name=f"TIME PERDEDOR:", value=[player.name for player in time_losse], inline=False)
-    embed.add_field(name=f"PONTOS PERDIDOS:", value=points_losse, inline=False)
+    embed.add_field(name=f"PONTOS RECEBIDOS:", value=points, inline=False)
+    embed.add_field(name=f"RANK:", value=player.rank, inline=False)
+    embed.add_field(name=f"VITORIA:", value=player.wins, inline=False)
+    embed.add_field(name=f"DERROTA:", value=player.losses, inline=False)
+    return embed
 
-    # embed.add_field(name="CANAL PARA VOTAÇÃO DOS MAPS:",
-    #                 value=f"[{channel.name}](https://discord.com/channels/{channel.guild.id}/{channel.id})",
-    #                 inline=False)
+
+def losse_embed_message(player, points):
+    embed = discord.Embed(title='MATCHMAKING VITORIA', description="SEU TIME PERDEU!!!", color=0xff0000)
+    embed.set_thumbnail(url="https://i.ibb.co/G3mkZ1p/Screenshot-from-2024-03-13-14-31-37.png")
+    embed.add_field(name=f"PONTOS PERDIDOS:", value=points, inline=False)
+    embed.add_field(name=f"RANK:", value=player.rank, inline=False)
+    embed.add_field(name=f"VITORIA:", value=player.wins, inline=False)
+    embed.add_field(name=f"DERROTA:", value=player.losses, inline=False)
     return embed

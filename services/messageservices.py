@@ -8,6 +8,7 @@ class MessageService:
         self.category_guild_reference_queue = {}
         self.channel_votes_maps_session = {}
         self.voices_channel_session = {}
+        self.message_button_votes = {}
 
     def set_embed_message_join_queue(self, user, message):
         self.embed_message_join_queue_references[user.name] = message
@@ -65,4 +66,10 @@ class MessageService:
             b.custom_id = map_name
             b.callback = callback_vote_map
             view.add_item(b)
-        await channel.send(embed=embed, view=view)
+        self.set_message_button_votes(await channel.send(embed=embed, view=view), queue.id)
+
+    def set_message_button_votes(self, message, queue_id):
+        self.message_button_votes[queue_id] = message
+
+    async def delete_message_button_maps(self, queue_id):
+        await self.message_button_votes[queue_id.id].delete()

@@ -18,7 +18,7 @@ class PlayerCommandCog(commands.Cog):
     @app_commands.command()
     async def perfil(self, interact: discord.Interaction):
         # if await self.is_adm(interact):
-        player = self.player_service.find_player_by_discord_id(str(interact.user.id))
+        player = self.player_service.find_player_by_discord_id(str(interact.user.id), interact.user.name)
         if player is None:
             player = self.player_service.save_player(Player(None, str(interact.user.id), str(interact.user.name), Rank.RANK_B, 0, 0, 0, StatusQueue.DEFAULT))
         await interact.response.send_message(embed=embed_profile_message(player, interact.user), ephemeral=True)
