@@ -12,7 +12,14 @@ class BlackSecurityService:
         self.black_security_repository = BlackSecurityRepository()
 
     def save_key(self, key: str):
-        self.black_security_repository.save_many_keys(self.format_key_str_to_key(key))
+        if self.format_key_str_to_key(key) is False:
+            return False
+        try:
+            self.black_security_repository.save_many_keys(self.format_key_str_to_key(key))
+            return True
+        except:
+            return False
+
 
     def get_keys(self, num_keys: int):
         return self.black_security_repository.get_keys(num_keys)
@@ -50,12 +57,26 @@ class BlackSecurityService:
         self.black_security_repository.remove_key(key)
 
     def remove_keys(self, key):
+        if self.format_key_str_to_key(key) is False:
+            return False
         self.black_security_repository.remove_keys(self.format_key_str_to_key(key))
+        return True
+
+    def remove_all_keys(self):
+        self.black_security_repository.remove_all_keys()
 
     def format_key_str_to_key(self, key: str):
+        print(key)
+        if "-" in key:
+            split = key.split(" - ")
+            if len(split) != 2:
+                return False
+
         split = key.split(" - ")
         keys_to_send = []
         for value in split:
             splits = value.split(",")
+            if len(splits) != 2:
+                return False
             keys_to_send.append(Key(splits[0], splits[1]))
         return keys_to_send

@@ -110,11 +110,10 @@ def embed_profile_message(player: Player, user: discord.Interaction.user):
     embed.add_field(name="Winrate", value=f"{winrate:.0f}%" if winrate != 0 else "0%", inline=True)
     embed.add_field(name="Rank", value=player.rank.name, inline=True)
     return embed
-    # embed.add_field(name="Pontos", value=player.points, inline=True)
 
 
 def win_embed_message(player, points):
-    embed = discord.Embed(title='MATCHMAKING VITORIA', description="SEU TIME VENCEU!!!", color=0xff0000)
+    embed = discord.Embed(title='MATCHMAKING RESULTADO', description="SEU TIME VENCEU!!!", color=0xff0000)
     embed.set_thumbnail(url="https://i.ibb.co/G3mkZ1p/Screenshot-from-2024-03-13-14-31-37.png")
     embed.add_field(name=f"PONTOS RECEBIDOS:", value=points, inline=False)
     embed.add_field(name=f"RANK:", value=player.rank, inline=False)
@@ -124,7 +123,7 @@ def win_embed_message(player, points):
 
 
 def losse_embed_message(player, points):
-    embed = discord.Embed(title='MATCHMAKING VITORIA', description="SEU TIME PERDEU!!!", color=0xff0000)
+    embed = discord.Embed(title='MATCHMAKING RESULTADO', description="SEU TIME PERDEU!!!", color=0xff0000)
     embed.set_thumbnail(url="https://i.ibb.co/G3mkZ1p/Screenshot-from-2024-03-13-14-31-37.png")
     embed.add_field(name=f"PONTOS PERDIDOS:", value=points, inline=False)
     embed.add_field(name=f"RANK:", value=player.rank, inline=False)

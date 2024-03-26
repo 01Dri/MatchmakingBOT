@@ -14,6 +14,7 @@ from services.channelservice import ChannelService
 from services.playerservice import PlayerService
 from services.queuebuttonservice import QueueButtonService
 from services.roleservice import RoleService
+from utils.constants import MAX_PLAYER_ON_QUEUE, MAX_QUEUES, MINIMUM_PLAYER_QUEUE_START
 
 
 class QueueService:
@@ -39,7 +40,7 @@ class QueueService:
         return queue
 
     def start_queues(self):
-        if self.get_quantity_queue() >= 2:
+        if self.get_quantity_queue() >= MAX_QUEUES:
             return False
         self.queue_rank_a = self.create_queue(Rank.RANK_A, StatusQueue.DEFAULT)
         self.queue_rank_b = self.create_queue(Rank.RANK_B, StatusQueue.DEFAULT)
@@ -71,11 +72,18 @@ class QueueService:
         return self.queues_repository.get_amount_queue()
 
     def add_player_on_queue(self, player: Player, user):
+        if player.rank == Rank.RANK_A:
+            print("rank a")
+            print(self.queue_rank_a.get_amount_players())
+            if self.queue_rank_a.get_amount_players() < MINIMUM_PLAYER_QUEUE_START and self.queue_rank_b.get_amount_players() >= MINIMUM_PLAYER_QUEUE_START:
+                print("ENTROU NA RANK A")
+                self.queue_rank_b.add_player_queue(player, user)
 
-        if player.rank == self.queue_rank_a.rank:
-            print("ENTROU NA QUEUE A")
-            self.queue_rank_a.add_player_queue(player, user)
-            return self.queue_rank_a
+                return self.queue_rank_b
+            else:
+                self.queue_rank_a.add_player_queue(player, user)
+                return self.queue_rank_a
+
         else:
             print("ENTROU NA QUEUE B")
             self.queue_rank_b.add_player_queue(player, user)

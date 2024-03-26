@@ -68,6 +68,14 @@ class BlackSecurityRepository:
         self.conn.commit()
         self.close_connections()
 
+    def remove_all_keys(self):
+        QUERY = "DELETE FROM blackkeys"
+        cursor = self.get_cursor()
+        cursor.execute(QUERY)
+        self.conn.commit()
+        self.close_connections()
+
+
     def get_cursor(self):
         self.conn = sqlite3.connect("match.db")
         return self.conn.cursor()

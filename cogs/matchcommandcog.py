@@ -77,6 +77,23 @@ class MatchCommandCog(commands.Cog):
         await self.message_button.delete()
         self.message_button = None
 
+    @app_commands.command()
+    async def cancelarpartida(self, interact: discord.Interaction):
+        if await self.check_permissions(interact):
+            channel_id = str(interact.channel.category)  # CHANNEL ID É O ID DA MATCH
+            print(f"PARTIDA DO COMANDO CANCELAR: {self.match_service.get_matches()}")
+            print(f"ID DA CATEGORIA DO CANCELAR PARTIDA: {channel_id}")
+            match = self.match_service.find_match_by_id(channel_id)
+            print(self.message_button)
+            if match is None:
+                await interact.response.send_message("Nenhuma partida encontrada nesse canal", ephemeral=True)
+                return
+            await interact.response.send_message("Essa partida será removida em 20 segundos!")
+            self.update_queue_status_players(match)
+            await asyncio.sleep(20)
+            await self.remove_attributes_on_match(match)
+
+
     # @app_commands.command()
     # async def vencedor
 
@@ -137,6 +154,11 @@ class MatchCommandCog(commands.Cog):
         # return False
 
         # return self.votes["nao"]
+    async def check_permissions(self, interact):
+        if not interact.user.guild_permissions.administrator:
+            await interact.response.send_message("Você precisa ser um ADM para usar esse comando!!!", ephemeral=True)
+            return False
+        return True
 
 
 async def setup(bot):

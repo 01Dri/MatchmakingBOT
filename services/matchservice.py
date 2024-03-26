@@ -22,7 +22,9 @@ class MatchService:
         self.queue_service = QueueService()
 
     def add_match(self, match: Match):
-        return self.match_repository.save_match(match)
+        match = self.match_repository.save_match(match)
+        print(self.get_matches())
+        return match
 
     def get_quantity_matches(self):
         return self.match_repository.get_amount_matches()
@@ -39,8 +41,7 @@ class MatchService:
             return self.match_repository.remove_match(match)
         return False
 
-    async def send_points_to_users(self, match_id, result, message_reference):
-        match = self.find_match_by_id(match_id)
+    async def send_points_to_users(self, match, result, message_reference):
         if result == 'a':
             await self.add_points_winner(match, match.team_a, message_reference)
             await self.remove_points_losser(match, match.team_b, message_reference)

@@ -3,6 +3,13 @@ from entities.Match import Match
 
 class MatchRepository:
 
+    _instance = None
+
+    def __new__(cls, *args, **kwargs):
+        if not cls._instance:
+            cls._instance = super().__new__(cls, *args, **kwargs)
+        return cls._instance
+
     def __init__(self):
         self.matches = {}
 
@@ -12,9 +19,11 @@ class MatchRepository:
 
     def find_match_by_id(self, id_match: str):
         for keys in self.matches.keys():
+            print(f"KEYS DAS MATCHES: {keys}", f"TIPOS: {type(keys)}")
+            print(f"ID DA MATCHE PARA REMOVER: {id_match}", f"TIPO {type(id_match)}")
             if keys == id_match:
+                print("SIM O ID É IGUAL")
                 return self.matches[keys]
-            return None
 
     def remove_match(self, match: Match):
         for matches in self.matches.values():

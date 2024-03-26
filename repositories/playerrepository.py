@@ -1,6 +1,7 @@
 import sqlite3
 
 from entities.Player import Player
+from enums.StatusQueue import StatusQueue
 from exceptions.exceptions import NotFoundPlayerException
 from enums.Rank import Rank
 
@@ -57,10 +58,10 @@ class PlayerRepository:
     def reset_all(self):
         QUERY_UPDATE = """
             UPDATE players
-            SET rank = ?, points = ?, wins = ?, losses = ?
+            SET rank = ?, points = ?, wins = ?, losses = ?, queue_status = ?
         """
         cursor = self.get_cursor()
-        cursor.execute(QUERY_UPDATE, (Rank.RANK_B.value, 0, 0, 0))
+        cursor.execute(QUERY_UPDATE, (Rank.RANK_B.value, 0, 0, 0, StatusQueue.DEFAULT.value))
         self.conn.commit()
         self.close_connections()
         return True

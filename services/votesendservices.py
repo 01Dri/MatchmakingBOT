@@ -1,61 +1,45 @@
+from utils.constants import MAX_VOTES_END
+
+
 class VotesEndService:
 
     def __init__(self):
-        self.votes = {}
-        self.votes_users = {}
         self.votes_session = {}
-        pass
+        self.votes = {'a': 0, 'b': 0}
+        self.votes_users = {}
 
-    def add_vote(self, queue_id, vote, user):
-        if 'a' not in self.votes.keys() and 'b' not in self.votes.keys():
-            self.votes['a'] = 0
-            self.votes['b'] = 0
+    def get_session_vote(self, queue_id):
+        if queue_id in self.votes_session.keys():
+            return self.votes_session[queue_id]
+        return self.set_session_votes_teams(queue_id)
 
+    def set_session_votes_teams(self, queue_id):
         if queue_id not in self.votes_session.keys():
-            self.votes_session[queue_id] = []
-            self.votes[vote] = 1
-            self.votes_users[user] = vote
-            self.votes_session[queue_id].append(self.votes)
-            self.votes_session[queue_id].append(self.votes_users)
-        else:
-            self.votes = self.votes_session[queue_id][0]
-            self.votes_users = self.votes_session[queue_id][1]
-            if user in self.votes_users.keys():
-                return False
-            if vote in self.votes.keys():
-                self.votes[vote] += 1
-                self.votes_users[user] = vote
-            else:
-                self.votes[vote] = 1
-                self.votes_users[user] = vote
+            self.votes_session[queue_id] = {'votes': {'a': 0, 'b': 0}, 'users': {}}
+            return self.votes_session[queue_id]
 
-        self.votes_session[queue_id].append(self.votes)
-        self.votes_session[queue_id].append(self.votes_users)
-        print(self.votes_users)
-        print(self.votes)
+    def add_vote_user_to_session(self, user, session, team):
+        if user not in session['users'].keys():
+            session['users'][user] = team
+            return session
+        return False
 
-    def get_result_voting(self, queue_id):
-        if queue_id not in self.votes_session.keys():
-            return None
+    def add_vote_map_to_session(self, session, team):
+        session['votes'][team] += 1
+        return session
 
-        self.votes = self.votes_session[queue_id][0]
-        print(self.votes)
-        if self.votes['a'] >= 2:
-            # del self.votes['a']
-            # del self.votes['b']
-            # self.votes_users.clear()
-            print("TIME A VENCEU")
+    def get_result_votes_session(self, session):
+        if session['votes']['a'] >= MAX_VOTES_END:
+            del session
             return 'a'
-
-        if self.votes['b'] >= 2:
-            print("TIME B VENCEU")
+        if session['votes']['b'] >= MAX_VOTES_END:
+            del session
             return 'b'
-
-        self.votes = self.votes_session[queue_id][0]
-        self.votes_users = self.votes_session[queue_id][1]
-        self.votes_users.clear()
-        self.votes['a'] = 0
-        self.votes['b'] = 0
-
+        print(session)
+        print(session.keys(), session.values())
+        session['votes']['a'] = 0
+        session['votes']['b'] = 0
+        session['users'].clear()
         return None
+
 
